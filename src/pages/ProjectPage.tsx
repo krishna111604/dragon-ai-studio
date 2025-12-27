@@ -5,10 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image, Play, Pause
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
@@ -45,6 +46,20 @@ export default function ProjectPage() {
   const [aiResults, setAiResults] = useState<Record<string, any>>({});
   const [copied, setCopied] = useState(false);
   const [insightRefresh, setInsightRefresh] = useState(0);
+  
+  // Image generation state
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  
+  // Music generation state
+  const [musicPrompt, setMusicPrompt] = useState("");
+  const [musicMood, setMusicMood] = useState("");
+  const [generatingMusic, setGeneratingMusic] = useState(false);
+  const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -115,8 +130,87 @@ export default function ProjectPage() {
     setAiLoading(null);
   };
 
+  const generateSceneImage = async () => {
+    if (!imagePrompt.trim()) {
+      toast({ title: "Error", description: "Please describe the scene you want to visualize", variant: "destructive" });
+      return;
+    }
+
+    setGeneratingImage(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-scene-image", {
+        body: {
+          prompt: imagePrompt,
+          projectName: project?.name,
+          genre: project?.genre,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setGeneratedImage(data.imageUrl);
+      toast({ title: "Image Generated", description: "Your scene visualization is ready!" });
+    } catch (error: any) {
+      toast({ title: "Generation Error", description: error.message || "Failed to generate image", variant: "destructive" });
+    }
+    setGeneratingImage(false);
+  };
+
+  const generateSceneMusic = async () => {
+    if (!musicPrompt.trim()) {
+      toast({ title: "Error", description: "Please describe the scene for music generation", variant: "destructive" });
+      return;
+    }
+
+    setGeneratingMusic(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-scene-music", {
+        body: {
+          prompt: musicPrompt,
+          mood: musicMood,
+          genre: project?.genre,
+          duration: 30,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) {
+        if (data.needsApiKey) {
+          toast({ title: "API Key Required", description: "Please add ELEVENLABS_API_KEY to your project secrets", variant: "destructive" });
+        } else {
+          throw new Error(data.error);
+        }
+        return;
+      }
+
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      setGeneratedAudio(audioUrl);
+      toast({ title: "Music Generated", description: "Your scene music is ready to play!" });
+    } catch (error: any) {
+      toast({ title: "Generation Error", description: error.message || "Failed to generate music", variant: "destructive" });
+    }
+    setGeneratingMusic(false);
+  };
+
+  const togglePlayMusic = () => {
+    if (!generatedAudio) return;
+    
+    if (isPlaying && audioElement) {
+      audioElement.pause();
+      setIsPlaying(false);
+    } else {
+      const audio = new Audio(generatedAudio);
+      audio.onended = () => setIsPlaying(false);
+      audio.play();
+      setAudioElement(audio);
+      setIsPlaying(true);
+    }
+  };
+
   const copyResults = (featureId: string) => {
-    navigator.clipboard.writeText(JSON.stringify(aiResults[featureId], null, 2));
+    const content = aiResults[featureId]?.content || JSON.stringify(aiResults[featureId], null, 2);
+    navigator.clipboard.writeText(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast({ title: "Copied", description: "Results copied to clipboard" });
@@ -124,18 +218,32 @@ export default function ProjectPage() {
 
   const renderAnalysis = (data: any) => {
     if (!data) return null;
-    if (data.rawAnalysis) return <pre className="whitespace-pre-wrap text-sm">{data.rawAnalysis}</pre>;
+    
+    // Render natural prose content
+    if (data.content) {
+      return (
+        <div className="prose prose-sm prose-invert max-w-none">
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+            {data.content}
+          </div>
+        </div>
+      );
+    }
+    
+    if (data.rawAnalysis) {
+      return <pre className="whitespace-pre-wrap text-sm">{data.rawAnalysis}</pre>;
+    }
     
     return Object.entries(data).map(([key, value]) => (
       <div key={key} className="mb-4">
         <h4 className="font-semibold text-primary capitalize mb-2">{key.replace(/([A-Z])/g, ' $1').trim()}</h4>
         <div className="text-sm text-muted-foreground">
-          {Array.isArray(value) ? (
+          {typeof value === 'string' ? (
+            <p className="whitespace-pre-wrap">{value}</p>
+          ) : Array.isArray(value) ? (
             <ul className="list-disc list-inside space-y-1">
               {value.map((item, i) => <li key={i}>{typeof item === 'object' ? JSON.stringify(item) : String(item)}</li>)}
             </ul>
-          ) : typeof value === 'object' ? (
-            <pre className="text-xs bg-muted/50 p-2 rounded">{JSON.stringify(value, null, 2)}</pre>
           ) : (
             <p>{String(value)}</p>
           )}
@@ -169,7 +277,7 @@ export default function ProjectPage() {
 
       <main className="container mx-auto px-4 py-6 relative z-10">
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Script Input */}
+          {/* Left Column - Script Input & Creative Tools */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <div className="card-cinematic rounded-xl p-6">
               <h3 className="font-semibold mb-4">Script Content</h3>
@@ -177,7 +285,7 @@ export default function ProjectPage() {
                 value={scriptContent}
                 onChange={(e) => setScriptContent(e.target.value)}
                 placeholder="Paste your script here..."
-                className="min-h-[300px] bg-muted/50 border-border"
+                className="min-h-[200px] bg-muted/50 border-border"
               />
             </div>
             <div className="card-cinematic rounded-xl p-6">
@@ -186,15 +294,63 @@ export default function ProjectPage() {
                 value={sceneDescription}
                 onChange={(e) => setSceneDescription(e.target.value)}
                 placeholder="Describe the scene you want to analyze..."
-                className="min-h-[150px] bg-muted/50 border-border"
+                className="min-h-[120px] bg-muted/50 border-border"
               />
             </div>
             
-            {/* Saved Insights */}
+            {/* Image Generation */}
+            <div className="card-cinematic rounded-xl p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2"><Image className="w-5 h-5 text-primary" /> Scene Visualizer</h3>
+              <p className="text-sm text-muted-foreground mb-3">Generate a visual concept for your scene</p>
+              <Textarea 
+                value={imagePrompt}
+                onChange={(e) => setImagePrompt(e.target.value)}
+                placeholder="Describe the scene you want to visualize... (e.g., 'A dimly lit detective's office at night, noir style, rain on windows')"
+                className="min-h-[80px] bg-muted/50 border-border mb-3"
+              />
+              <Button onClick={generateSceneImage} disabled={generatingImage} className="w-full bg-gradient-gold text-primary-foreground">
+                {generatingImage ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Image className="w-4 h-4 mr-2" /> Generate Scene Image</>}
+              </Button>
+              {generatedImage && (
+                <div className="mt-4">
+                  <img src={generatedImage} alt="Generated scene" className="w-full rounded-lg shadow-lg" />
+                </div>
+              )}
+            </div>
+
+            {/* Music Generation */}
+            <div className="card-cinematic rounded-xl p-6">
+              <h3 className="font-semibold mb-4 flex items-center gap-2"><Music className="w-5 h-5 text-primary" /> Scene Music Generator</h3>
+              <p className="text-sm text-muted-foreground mb-3">Generate sample music for your scene</p>
+              <Textarea 
+                value={musicPrompt}
+                onChange={(e) => setMusicPrompt(e.target.value)}
+                placeholder="Describe the scene mood... (e.g., 'Tense chase sequence through city streets')"
+                className="min-h-[60px] bg-muted/50 border-border mb-3"
+              />
+              <Input
+                value={musicMood}
+                onChange={(e) => setMusicMood(e.target.value)}
+                placeholder="Mood (e.g., suspenseful, romantic, triumphant)"
+                className="bg-muted/50 border-border mb-3"
+              />
+              <Button onClick={generateSceneMusic} disabled={generatingMusic} className="w-full bg-gradient-gold text-primary-foreground">
+                {generatingMusic ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Music className="w-4 h-4 mr-2" /> Generate Music</>}
+              </Button>
+              {generatedAudio && (
+                <div className="mt-4 flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <Button onClick={togglePlayMusic} variant="outline" size="sm">
+                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">Scene music ready</span>
+                </div>
+              )}
+            </div>
+            
             {id && <SavedInsightsList projectId={id} refreshTrigger={insightRefresh} />}
           </motion.div>
 
-          {/* AI Features */}
+          {/* Right Column - AI Features */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <Tabs defaultValue="script_analysis" className="space-y-4">
               <TabsList className="grid grid-cols-3 lg:grid-cols-6 bg-muted/50">
@@ -242,7 +398,7 @@ export default function ProjectPage() {
                       </div>
                     </div>
                     
-                    <div className="min-h-[300px] bg-muted/30 rounded-lg p-4 overflow-auto">
+                    <div className="min-h-[300px] max-h-[500px] bg-muted/30 rounded-lg p-4 overflow-auto">
                       {aiLoading === feature.id ? (
                         <div className="flex items-center justify-center h-full">
                           <div className="text-center">
