@@ -99,7 +99,7 @@ export default function Dashboard() {
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
     } else {
       setProjects(projects.filter(p => p.id !== id));
-      toast({ title: "Deleted", description: "Project removed" });
+      toast({ title: "Deleted", description: "Project removed", duration: 1000 });
     }
   };
 
