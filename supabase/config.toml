@@ -2,3 +2,9 @@ project_id = "zzlobnmoekubnqnhzxzn"
 
 [functions.dragon-ai]
 verify_jwt = false
+
+[functions.generate-scene-image]
+verify_jwt = false
+
+[functions.generate-scene-music]
+verify_jwt = false
