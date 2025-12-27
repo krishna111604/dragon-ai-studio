@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Music, Image as ImageIcon, Trash2, Play, Pause, Loader2, FolderOpen
+  Music, Image as ImageIcon, Trash2, Play, Pause, Loader2, FolderOpen, FileText, ChevronDown, ChevronUp
 } from "lucide-react";
 
 interface SceneMedia {
@@ -106,6 +106,17 @@ export function SavedMediaList({ projectId, mediaType = "all", refreshTrigger }:
     );
   }
 
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const isComposition = (item: SceneMedia) => item.media_type === "composition" || item.media_url.startsWith("composition:");
+
+  const getCompositionContent = (item: SceneMedia) => {
+    if (item.media_url.startsWith("composition:")) {
+      return item.media_url.substring(12);
+    }
+    return item.media_url;
+  };
+
   return (
     <div className="space-y-3">
       {media.map((item, index) => (
@@ -114,50 +125,80 @@ export function SavedMediaList({ projectId, mediaType = "all", refreshTrigger }:
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.05 }}
-          className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg group hover:bg-muted/50 transition-colors"
+          className="bg-muted/30 rounded-lg group hover:bg-muted/50 transition-colors"
         >
-          {item.media_type === "image" ? (
-            <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0">
-              <img src={item.media_url} alt={item.title} className="w-full h-full object-cover" />
+          <div className="flex items-center gap-3 p-3">
+            {item.media_type === "image" ? (
+              <div className="w-16 h-12 rounded overflow-hidden flex-shrink-0">
+                <img src={item.media_url} alt={item.title} className="w-full h-full object-cover" />
+              </div>
+            ) : isComposition(item) ? (
+              <div className="w-12 h-12 rounded bg-accent/20 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-accent" />
+              </div>
+            ) : (
+              <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Music className="w-5 h-5 text-primary" />
+              </div>
+            )}
+            
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{item.title}</p>
+              <p className="text-xs text-muted-foreground truncate">{item.prompt}</p>
+              <p className="text-xs text-muted-foreground/60">
+                {new Date(item.created_at).toLocaleDateString()}
+                {isComposition(item) && <span className="ml-2 text-accent">(Composition Guide)</span>}
+              </p>
             </div>
-          ) : (
-            <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Music className="w-5 h-5 text-primary" />
-            </div>
-          )}
-          
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate">{item.title}</p>
-            <p className="text-xs text-muted-foreground truncate">{item.prompt}</p>
-            <p className="text-xs text-muted-foreground/60">
-              {new Date(item.created_at).toLocaleDateString()}
-            </p>
-          </div>
 
-          <div className="flex items-center gap-1">
-            {item.media_type === "music" && (
+            <div className="flex items-center gap-1">
+              {isComposition(item) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                  className="h-8 w-8 p-0"
+                >
+                  {expandedId === item.id ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
+              {item.media_type === "music" && !isComposition(item) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => togglePlay(item)}
+                  className="h-8 w-8 p-0"
+                >
+                  {playingId === item.id ? (
+                    <Pause className="w-4 h-4" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => togglePlay(item)}
-                className="h-8 w-8 p-0"
+                onClick={() => deleteMedia(item.id)}
+                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
               >
-                {playingId === item.id ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
+                <Trash2 className="w-4 h-4" />
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => deleteMedia(item.id)}
-              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            </div>
           </div>
+          
+          {/* Expanded composition content */}
+          {isComposition(item) && expandedId === item.id && (
+            <div className="px-3 pb-3">
+              <div className="p-3 bg-background/50 rounded text-xs text-foreground/80 whitespace-pre-wrap max-h-[200px] overflow-auto">
+                {getCompositionContent(item)}
+              </div>
+            </div>
+          )}
         </motion.div>
       ))}
     </div>
