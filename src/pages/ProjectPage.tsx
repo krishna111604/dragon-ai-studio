@@ -5,11 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image, Play, Pause, Download
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
@@ -49,24 +48,6 @@ export default function ProjectPage() {
   const [copied, setCopied] = useState(false);
   const [insightRefresh, setInsightRefresh] = useState(0);
   const [mediaRefresh, setMediaRefresh] = useState(0);
-  
-  // Image generation state
-  const [imagePrompt, setImagePrompt] = useState("");
-  const [imageTitle, setImageTitle] = useState("");
-  const [generatingImage, setGeneratingImage] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [savingImage, setSavingImage] = useState(false);
-  
-  // Music generation state
-  const [musicPrompt, setMusicPrompt] = useState("");
-  const [musicMood, setMusicMood] = useState("");
-  const [musicTitle, setMusicTitle] = useState("");
-  const [generatingMusic, setGeneratingMusic] = useState(false);
-  const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
-  const [compositionGuide, setCompositionGuide] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-  const [savingMusic, setSavingMusic] = useState(false);
   
   const { toast } = useToast();
 
@@ -136,149 +117,6 @@ export default function ProjectPage() {
       toast({ title: "AI Error", description: error.message || "Failed to run analysis", variant: "destructive" });
     }
     setAiLoading(null);
-  };
-
-  const generateSceneImage = async () => {
-    if (!imagePrompt.trim()) {
-      toast({ title: "Error", description: "Please describe the scene you want to visualize", variant: "destructive" });
-      return;
-    }
-
-    setGeneratingImage(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-scene-image", {
-        body: {
-          prompt: imagePrompt,
-          projectName: project?.name,
-          genre: project?.genre,
-        },
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      setGeneratedImage(data.imageUrl);
-      toast({ title: "Image Generated", description: "Your scene visualization is ready!" });
-    } catch (error: any) {
-      toast({ title: "Generation Error", description: error.message || "Failed to generate image", variant: "destructive" });
-    }
-    setGeneratingImage(false);
-  };
-
-  const saveGeneratedImage = async () => {
-    if (!generatedImage || !user || !id) return;
-    
-    setSavingImage(true);
-    try {
-      const { error } = await supabase.from("scene_media").insert({
-        project_id: id,
-        user_id: user.id,
-        media_type: "image",
-        title: imageTitle || "Scene Image",
-        prompt: imagePrompt,
-        media_url: generatedImage,
-      });
-
-      if (error) throw error;
-      
-      toast({ title: "Saved", description: "Image added to storyboard" });
-      setMediaRefresh(prev => prev + 1);
-      setGeneratedImage(null);
-      setImagePrompt("");
-      setImageTitle("");
-    } catch (error: any) {
-      toast({ title: "Error", description: "Failed to save image", variant: "destructive" });
-    }
-    setSavingImage(false);
-  };
-
-  const generateSceneMusic = async () => {
-    if (!musicPrompt.trim()) {
-      toast({ title: "Error", description: "Please describe the scene for music generation", variant: "destructive" });
-      return;
-    }
-
-    setGeneratingMusic(true);
-    setCompositionGuide(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-scene-music", {
-        body: {
-          prompt: musicPrompt,
-          mood: musicMood,
-          genre: project?.genre,
-          duration: 30,
-        },
-      });
-
-      if (error) throw error;
-      if (data.error) {
-        if (data.needsApiKey) {
-          toast({ title: "API Key Required", description: "Please configure your API keys", variant: "destructive" });
-        } else {
-          throw new Error(data.error);
-        }
-        return;
-      }
-
-      // Check if we got actual audio or a composition guide
-      if (data.audioContent) {
-        const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-        setGeneratedAudio(audioUrl);
-        toast({ title: "Music Generated", description: "Your scene music is ready to play!" });
-      } else if (data.compositionGuide) {
-        setCompositionGuide(data.compositionGuide);
-        toast({ title: "Composition Guide Created", description: "AI has created a detailed music composition guide for your scene." });
-      }
-    } catch (error: any) {
-      toast({ title: "Generation Error", description: error.message || "Failed to generate music", variant: "destructive" });
-    }
-    setGeneratingMusic(false);
-  };
-
-  const saveGeneratedMusic = async () => {
-    if ((!generatedAudio && !compositionGuide) || !user || !id) return;
-    
-    setSavingMusic(true);
-    try {
-      const mediaUrl = generatedAudio || `composition:${compositionGuide?.substring(0, 500)}`;
-      const { error } = await supabase.from("scene_media").insert({
-        project_id: id,
-        user_id: user.id,
-        media_type: generatedAudio ? "music" : "composition",
-        title: musicTitle || (generatedAudio ? "Scene Music" : "Music Composition Guide"),
-        prompt: musicPrompt,
-        media_url: mediaUrl,
-        mood: musicMood,
-      });
-
-      if (error) throw error;
-      
-      toast({ title: "Saved", description: generatedAudio ? "Music saved to project" : "Composition guide saved" });
-      setMediaRefresh(prev => prev + 1);
-      setGeneratedAudio(null);
-      setCompositionGuide(null);
-      setMusicPrompt("");
-      setMusicMood("");
-      setMusicTitle("");
-    } catch (error: any) {
-      toast({ title: "Error", description: "Failed to save", variant: "destructive" });
-    }
-    setSavingMusic(false);
-  };
-
-  const togglePlayMusic = () => {
-    if (!generatedAudio) return;
-    
-    if (isPlaying && audioElement) {
-      audioElement.pause();
-      setIsPlaying(false);
-    } else {
-      const audio = new Audio(generatedAudio);
-      audio.onended = () => setIsPlaying(false);
-      audio.play();
-      setAudioElement(audio);
-      setIsPlaying(true);
-    }
   };
 
   const copyResults = (featureId: string) => {
@@ -382,89 +220,35 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      {/* Scene Visualizer */}
-      <div className="card-cinematic rounded-xl p-5">
-        <h3 className="font-semibold mb-3 flex items-center gap-2"><Image className="w-5 h-5 text-primary" /> Scene Visualizer</h3>
-        <p className="text-sm text-muted-foreground mb-3">Generate a visual concept for your scene</p>
-        <Input 
-          value={imageTitle}
-          onChange={(e) => setImageTitle(e.target.value)}
-          placeholder="Scene title (e.g., 'Opening Shot')"
-          className="bg-muted/50 border-border mb-2"
-        />
-        <Textarea 
-          value={imagePrompt}
-          onChange={(e) => setImagePrompt(e.target.value)}
-          placeholder="Describe the scene... (e.g., 'A dimly lit detective's office at night, noir style')"
-          className="min-h-[70px] bg-muted/50 border-border mb-3"
-        />
-        <Button onClick={generateSceneImage} disabled={generatingImage} className="w-full bg-gradient-gold text-primary-foreground">
-          {generatingImage ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Image className="w-4 h-4 mr-2" /> Generate Scene Image</>}
-        </Button>
-        {generatedImage && (
-          <div className="mt-4">
-            <img src={generatedImage} alt="Generated scene" className="w-full rounded-lg shadow-lg mb-3" />
-            <Button onClick={saveGeneratedImage} disabled={savingImage} className="w-full" variant="outline">
-              {savingImage ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
-              Save to Storyboard
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Music Generator */}
-      <div className="card-cinematic rounded-xl p-5">
-        <h3 className="font-semibold mb-3 flex items-center gap-2"><Music className="w-5 h-5 text-primary" /> Scene Music Generator</h3>
-        <p className="text-sm text-muted-foreground mb-3">Generate sample music for your scene</p>
-        <Input 
-          value={musicTitle}
-          onChange={(e) => setMusicTitle(e.target.value)}
-          placeholder="Music title (e.g., 'Chase Theme')"
-          className="bg-muted/50 border-border mb-2"
-        />
-        <Textarea 
-          value={musicPrompt}
-          onChange={(e) => setMusicPrompt(e.target.value)}
-          placeholder="Describe the scene mood... (e.g., 'Tense chase sequence')"
-          className="min-h-[60px] bg-muted/50 border-border mb-2"
-        />
-        <Input
-          value={musicMood}
-          onChange={(e) => setMusicMood(e.target.value)}
-          placeholder="Mood (e.g., suspenseful, romantic)"
-          className="bg-muted/50 border-border mb-3"
-        />
-        <Button onClick={generateSceneMusic} disabled={generatingMusic} className="w-full bg-gradient-gold text-primary-foreground">
-          {generatingMusic ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Music className="w-4 h-4 mr-2" /> Generate Music</>}
-        </Button>
-        {generatedAudio && (
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <Button onClick={togglePlayMusic} variant="outline" size="sm">
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </Button>
-              <span className="text-sm text-muted-foreground">Scene music ready</span>
-            </div>
-            <Button onClick={saveGeneratedMusic} disabled={savingMusic} className="w-full" variant="outline">
-              {savingMusic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
-              Save Music
-            </Button>
-          </div>
-        )}
-        {compositionGuide && !generatedAudio && (
-          <div className="mt-4 space-y-3">
-            <div className="p-4 bg-muted/30 rounded-lg max-h-[300px] overflow-auto">
-              <h4 className="font-semibold text-sm mb-2 text-primary">AI Composition Guide</h4>
-              <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
-                {compositionGuide}
+      {/* Quick Links to Generators */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Link to={`/project/${id}/visualizer`}>
+          <div className="card-cinematic rounded-xl p-5 hover:border-primary/50 transition-colors cursor-pointer group">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
+                <Image className="w-6 h-6 text-primary" />
               </div>
+              <h3 className="font-semibold">Scene Visualizer</h3>
             </div>
-            <Button onClick={saveGeneratedMusic} disabled={savingMusic} className="w-full" variant="outline">
-              {savingMusic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
-              Save Composition Guide
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              Generate AI-powered visual concepts and storyboard images for your scenes
+            </p>
           </div>
-        )}
+        </Link>
+        
+        <Link to={`/project/${id}/music`}>
+          <div className="card-cinematic rounded-xl p-5 hover:border-primary/50 transition-colors cursor-pointer group">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
+                <Music className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold">Scene Music Generator</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Create AI music compositions and detailed composition guides for your scenes
+            </p>
+          </div>
+        </Link>
       </div>
 
       {/* Saved Media */}
