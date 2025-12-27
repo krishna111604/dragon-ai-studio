@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Film, Plus, FolderOpen, Trash2, LogOut, Sparkles, 
+  Film, Plus, FolderOpen, Trash2, Sparkles, 
   Clapperboard, Brain, Music, BookOpen, TrendingUp, Search
 } from "lucide-react";
 import {
@@ -18,7 +18,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AppSidebar } from "@/components/AppSidebar";
+import { RecentInsightsWidget } from "@/components/RecentInsightsWidget";
+import { InspirationFeed } from "@/components/InspirationFeed";
+import { DragonAnimation } from "@/components/DragonAnimation";
 
 interface Project {
   id: string;
@@ -39,7 +42,7 @@ const aiFeatures = [
 ];
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -105,26 +108,11 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-gold flex items-center justify-center shadow-gold">
-              <Film className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-display text-xl text-gradient-gold tracking-wider">DRAGON AI</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex relative">
+      <DragonAnimation />
+      <AppSidebar />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="flex-1 p-8 relative z-10">
         {/* Welcome */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <h1 className="text-3xl font-display text-gradient-gold mb-2">Welcome Back, Director</h1>
@@ -144,6 +132,12 @@ export default function Dashboard() {
             ))}
           </div>
         </motion.div>
+
+        {/* Recent Insights */}
+        <RecentInsightsWidget />
+
+        {/* Inspiration Feed */}
+        <InspirationFeed />
 
         {/* Projects */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>

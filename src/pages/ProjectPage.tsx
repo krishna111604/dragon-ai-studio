@@ -11,6 +11,9 @@ import {
   Music, BookOpen, TrendingUp, Loader2, Copy, Check
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SaveInsightButton } from "@/components/SaveInsightButton";
+import { SavedInsightsList } from "@/components/SavedInsightsList";
+import { DragonAnimation } from "@/components/DragonAnimation";
 
 interface Project {
   id: string;
@@ -41,6 +44,7 @@ export default function ProjectPage() {
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<Record<string, any>>({});
   const [copied, setCopied] = useState(false);
+  const [insightRefresh, setInsightRefresh] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -144,7 +148,9 @@ export default function ProjectPage() {
   if (!project) return <div className="min-h-screen bg-background flex items-center justify-center"><p>Project not found</p></div>;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      <DragonAnimation />
+      
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -161,7 +167,7 @@ export default function ProjectPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 relative z-10">
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Script Input */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
@@ -183,6 +189,9 @@ export default function ProjectPage() {
                 className="min-h-[150px] bg-muted/50 border-border"
               />
             </div>
+            
+            {/* Saved Insights */}
+            {id && <SavedInsightsList projectId={id} refreshTrigger={insightRefresh} />}
           </motion.div>
 
           {/* AI Features */}
@@ -209,9 +218,18 @@ export default function ProjectPage() {
                       </div>
                       <div className="flex gap-2">
                         {aiResults[feature.id] && (
-                          <Button variant="outline" size="sm" onClick={() => copyResults(feature.id)}>
-                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                          </Button>
+                          <>
+                            <SaveInsightButton
+                              projectId={id!}
+                              featureId={feature.id}
+                              featureName={feature.name}
+                              analysisData={aiResults[feature.id]}
+                              onSaved={() => setInsightRefresh(prev => prev + 1)}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => copyResults(feature.id)}>
+                              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                            </Button>
+                          </>
                         )}
                         <Button 
                           onClick={() => runAiFeature(feature.id)}
