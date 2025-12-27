@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image, Play, Pause
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image, Play, Pause, Download
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
 import { SavedInsightsList } from "@/components/SavedInsightsList";
 import { DragonAnimation } from "@/components/DragonAnimation";
+import { StoryboardView } from "@/components/StoryboardView";
+import { SavedMediaList } from "@/components/SavedMediaList";
 
 interface Project {
   id: string;
@@ -31,7 +33,7 @@ const aiFeatures = [
   { id: "dream_weaver", icon: Brain, name: "Dream Weaver", desc: "Creative brainstorming" },
   { id: "emotional_arc", icon: Music, name: "Emotional Arc", desc: "Music & sound suggestions" },
   { id: "film_historian", icon: BookOpen, name: "Film Historian", desc: "Find references & inspirations" },
-  { id: "oracle_prediction", icon: TrendingUp, name: "The Oracle", desc: "Predictive analytics" },
+  { id: "oracle_prediction", icon: TrendingUp, name: "The Oracle", desc: "Predictive analytics & creative tools" },
 ];
 
 export default function ProjectPage() {
@@ -46,19 +48,24 @@ export default function ProjectPage() {
   const [aiResults, setAiResults] = useState<Record<string, any>>({});
   const [copied, setCopied] = useState(false);
   const [insightRefresh, setInsightRefresh] = useState(0);
+  const [mediaRefresh, setMediaRefresh] = useState(0);
   
   // Image generation state
   const [imagePrompt, setImagePrompt] = useState("");
+  const [imageTitle, setImageTitle] = useState("");
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [savingImage, setSavingImage] = useState(false);
   
   // Music generation state
   const [musicPrompt, setMusicPrompt] = useState("");
   const [musicMood, setMusicMood] = useState("");
+  const [musicTitle, setMusicTitle] = useState("");
   const [generatingMusic, setGeneratingMusic] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [savingMusic, setSavingMusic] = useState(false);
   
   const { toast } = useToast();
 
@@ -157,6 +164,33 @@ export default function ProjectPage() {
     setGeneratingImage(false);
   };
 
+  const saveGeneratedImage = async () => {
+    if (!generatedImage || !user || !id) return;
+    
+    setSavingImage(true);
+    try {
+      const { error } = await supabase.from("scene_media").insert({
+        project_id: id,
+        user_id: user.id,
+        media_type: "image",
+        title: imageTitle || "Scene Image",
+        prompt: imagePrompt,
+        media_url: generatedImage,
+      });
+
+      if (error) throw error;
+      
+      toast({ title: "Saved", description: "Image added to storyboard" });
+      setMediaRefresh(prev => prev + 1);
+      setGeneratedImage(null);
+      setImagePrompt("");
+      setImageTitle("");
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to save image", variant: "destructive" });
+    }
+    setSavingImage(false);
+  };
+
   const generateSceneMusic = async () => {
     if (!musicPrompt.trim()) {
       toast({ title: "Error", description: "Please describe the scene for music generation", variant: "destructive" });
@@ -193,6 +227,35 @@ export default function ProjectPage() {
     setGeneratingMusic(false);
   };
 
+  const saveGeneratedMusic = async () => {
+    if (!generatedAudio || !user || !id) return;
+    
+    setSavingMusic(true);
+    try {
+      const { error } = await supabase.from("scene_media").insert({
+        project_id: id,
+        user_id: user.id,
+        media_type: "music",
+        title: musicTitle || "Scene Music",
+        prompt: musicPrompt,
+        media_url: generatedAudio,
+        mood: musicMood,
+      });
+
+      if (error) throw error;
+      
+      toast({ title: "Saved", description: "Music saved to project" });
+      setMediaRefresh(prev => prev + 1);
+      setGeneratedAudio(null);
+      setMusicPrompt("");
+      setMusicMood("");
+      setMusicTitle("");
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to save music", variant: "destructive" });
+    }
+    setSavingMusic(false);
+  };
+
   const togglePlayMusic = () => {
     if (!generatedAudio) return;
     
@@ -219,7 +282,6 @@ export default function ProjectPage() {
   const renderAnalysis = (data: any) => {
     if (!data) return null;
     
-    // Render natural prose content
     if (data.content) {
       return (
         <div className="prose prose-sm prose-invert max-w-none">
@@ -252,6 +314,141 @@ export default function ProjectPage() {
     ));
   };
 
+  const renderOracleContent = () => (
+    <div className="space-y-6">
+      {/* AI Analysis Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Predictive Analytics
+            </h3>
+            <p className="text-sm text-muted-foreground">Get AI predictions and insights</p>
+          </div>
+          <div className="flex gap-2">
+            {aiResults["oracle_prediction"] && (
+              <>
+                <SaveInsightButton
+                  projectId={id!}
+                  featureId="oracle_prediction"
+                  featureName="The Oracle"
+                  analysisData={aiResults["oracle_prediction"]}
+                  onSaved={() => setInsightRefresh(prev => prev + 1)}
+                />
+                <Button variant="outline" size="sm" onClick={() => copyResults("oracle_prediction")}>
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </>
+            )}
+            <Button 
+              onClick={() => runAiFeature("oracle_prediction")}
+              disabled={aiLoading === "oracle_prediction"}
+              className="bg-gradient-gold text-primary-foreground"
+            >
+              {aiLoading === "oracle_prediction" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Analyze
+            </Button>
+          </div>
+        </div>
+        
+        <div className="min-h-[150px] max-h-[300px] bg-muted/30 rounded-lg p-4 overflow-auto mb-6">
+          {aiLoading === "oracle_prediction" ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">AI is analyzing...</p>
+              </div>
+            </div>
+          ) : aiResults["oracle_prediction"] ? (
+            renderAnalysis(aiResults["oracle_prediction"])
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Click Analyze to get AI predictions</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Scene Visualizer */}
+      <div className="card-cinematic rounded-xl p-5">
+        <h3 className="font-semibold mb-3 flex items-center gap-2"><Image className="w-5 h-5 text-primary" /> Scene Visualizer</h3>
+        <p className="text-sm text-muted-foreground mb-3">Generate a visual concept for your scene</p>
+        <Input 
+          value={imageTitle}
+          onChange={(e) => setImageTitle(e.target.value)}
+          placeholder="Scene title (e.g., 'Opening Shot')"
+          className="bg-muted/50 border-border mb-2"
+        />
+        <Textarea 
+          value={imagePrompt}
+          onChange={(e) => setImagePrompt(e.target.value)}
+          placeholder="Describe the scene... (e.g., 'A dimly lit detective's office at night, noir style')"
+          className="min-h-[70px] bg-muted/50 border-border mb-3"
+        />
+        <Button onClick={generateSceneImage} disabled={generatingImage} className="w-full bg-gradient-gold text-primary-foreground">
+          {generatingImage ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Image className="w-4 h-4 mr-2" /> Generate Scene Image</>}
+        </Button>
+        {generatedImage && (
+          <div className="mt-4">
+            <img src={generatedImage} alt="Generated scene" className="w-full rounded-lg shadow-lg mb-3" />
+            <Button onClick={saveGeneratedImage} disabled={savingImage} className="w-full" variant="outline">
+              {savingImage ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+              Save to Storyboard
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Music Generator */}
+      <div className="card-cinematic rounded-xl p-5">
+        <h3 className="font-semibold mb-3 flex items-center gap-2"><Music className="w-5 h-5 text-primary" /> Scene Music Generator</h3>
+        <p className="text-sm text-muted-foreground mb-3">Generate sample music for your scene</p>
+        <Input 
+          value={musicTitle}
+          onChange={(e) => setMusicTitle(e.target.value)}
+          placeholder="Music title (e.g., 'Chase Theme')"
+          className="bg-muted/50 border-border mb-2"
+        />
+        <Textarea 
+          value={musicPrompt}
+          onChange={(e) => setMusicPrompt(e.target.value)}
+          placeholder="Describe the scene mood... (e.g., 'Tense chase sequence')"
+          className="min-h-[60px] bg-muted/50 border-border mb-2"
+        />
+        <Input
+          value={musicMood}
+          onChange={(e) => setMusicMood(e.target.value)}
+          placeholder="Mood (e.g., suspenseful, romantic)"
+          className="bg-muted/50 border-border mb-3"
+        />
+        <Button onClick={generateSceneMusic} disabled={generatingMusic} className="w-full bg-gradient-gold text-primary-foreground">
+          {generatingMusic ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Music className="w-4 h-4 mr-2" /> Generate Music</>}
+        </Button>
+        {generatedAudio && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Button onClick={togglePlayMusic} variant="outline" size="sm">
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              </Button>
+              <span className="text-sm text-muted-foreground">Scene music ready</span>
+            </div>
+            <Button onClick={saveGeneratedMusic} disabled={savingMusic} className="w-full" variant="outline">
+              {savingMusic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+              Save Music
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Saved Media */}
+      <div className="card-cinematic rounded-xl p-5">
+        <h3 className="font-semibold mb-3">Saved Media</h3>
+        <SavedMediaList projectId={id!} refreshTrigger={mediaRefresh} />
+      </div>
+    </div>
+  );
+
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
   if (!project) return <div className="min-h-screen bg-background flex items-center justify-center"><p>Project not found</p></div>;
 
@@ -276,8 +473,13 @@ export default function ProjectPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6 relative z-10">
+        {/* Storyboard Section */}
+        <div className="mb-6">
+          <StoryboardView projectId={id!} refreshTrigger={mediaRefresh} />
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-6">
-          {/* Left Column - Script Input & Creative Tools */}
+          {/* Left Column - Script Input */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <div className="card-cinematic rounded-xl p-6">
               <h3 className="font-semibold mb-4">Script Content</h3>
@@ -298,55 +500,6 @@ export default function ProjectPage() {
               />
             </div>
             
-            {/* Image Generation */}
-            <div className="card-cinematic rounded-xl p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2"><Image className="w-5 h-5 text-primary" /> Scene Visualizer</h3>
-              <p className="text-sm text-muted-foreground mb-3">Generate a visual concept for your scene</p>
-              <Textarea 
-                value={imagePrompt}
-                onChange={(e) => setImagePrompt(e.target.value)}
-                placeholder="Describe the scene you want to visualize... (e.g., 'A dimly lit detective's office at night, noir style, rain on windows')"
-                className="min-h-[80px] bg-muted/50 border-border mb-3"
-              />
-              <Button onClick={generateSceneImage} disabled={generatingImage} className="w-full bg-gradient-gold text-primary-foreground">
-                {generatingImage ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Image className="w-4 h-4 mr-2" /> Generate Scene Image</>}
-              </Button>
-              {generatedImage && (
-                <div className="mt-4">
-                  <img src={generatedImage} alt="Generated scene" className="w-full rounded-lg shadow-lg" />
-                </div>
-              )}
-            </div>
-
-            {/* Music Generation */}
-            <div className="card-cinematic rounded-xl p-6">
-              <h3 className="font-semibold mb-4 flex items-center gap-2"><Music className="w-5 h-5 text-primary" /> Scene Music Generator</h3>
-              <p className="text-sm text-muted-foreground mb-3">Generate sample music for your scene</p>
-              <Textarea 
-                value={musicPrompt}
-                onChange={(e) => setMusicPrompt(e.target.value)}
-                placeholder="Describe the scene mood... (e.g., 'Tense chase sequence through city streets')"
-                className="min-h-[60px] bg-muted/50 border-border mb-3"
-              />
-              <Input
-                value={musicMood}
-                onChange={(e) => setMusicMood(e.target.value)}
-                placeholder="Mood (e.g., suspenseful, romantic, triumphant)"
-                className="bg-muted/50 border-border mb-3"
-              />
-              <Button onClick={generateSceneMusic} disabled={generatingMusic} className="w-full bg-gradient-gold text-primary-foreground">
-                {generatingMusic ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Generating...</> : <><Music className="w-4 h-4 mr-2" /> Generate Music</>}
-              </Button>
-              {generatedAudio && (
-                <div className="mt-4 flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Button onClick={togglePlayMusic} variant="outline" size="sm">
-                    {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  </Button>
-                  <span className="text-sm text-muted-foreground">Scene music ready</span>
-                </div>
-              )}
-            </div>
-            
             {id && <SavedInsightsList projectId={id} refreshTrigger={insightRefresh} />}
           </motion.div>
 
@@ -361,7 +514,7 @@ export default function ProjectPage() {
                 ))}
               </TabsList>
 
-              {aiFeatures.map((feature) => (
+              {aiFeatures.filter(f => f.id !== "oracle_prediction").map((feature) => (
                 <TabsContent key={feature.id} value={feature.id}>
                   <div className="card-cinematic rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
@@ -417,6 +570,13 @@ export default function ProjectPage() {
                   </div>
                 </TabsContent>
               ))}
+
+              {/* The Oracle Tab with Generators */}
+              <TabsContent value="oracle_prediction">
+                <div className="card-cinematic rounded-xl p-6 max-h-[80vh] overflow-auto">
+                  {renderOracleContent()}
+                </div>
+              </TabsContent>
             </Tabs>
           </motion.div>
         </div>
