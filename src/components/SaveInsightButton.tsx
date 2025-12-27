@@ -10,6 +10,8 @@ interface SaveInsightButtonProps {
   featureId: string;
   featureName: string;
   analysisData: any;
+  scriptContent?: string;
+  sceneDescription?: string;
   onSaved?: () => void;
 }
 
@@ -18,6 +20,8 @@ export function SaveInsightButton({
   featureId, 
   featureName, 
   analysisData,
+  scriptContent,
+  sceneDescription,
   onSaved 
 }: SaveInsightButtonProps) {
   const { user } = useAuth();
@@ -29,12 +33,23 @@ export function SaveInsightButton({
     if (!user || !analysisData) return;
 
     setSaving(true);
+    
+    // Include the full context with the analysis
+    const fullContent = {
+      ...analysisData,
+      savedContext: {
+        scriptContent: scriptContent || null,
+        sceneDescription: sceneDescription || null,
+        savedAt: new Date().toISOString(),
+      }
+    };
+    
     const { error } = await supabase.from("project_insights").insert({
       user_id: user.id,
       project_id: projectId,
       insight_type: featureId,
       title: featureName,
-      content: analysisData,
+      content: fullContent,
       is_saved: true,
     });
 
@@ -42,7 +57,7 @@ export function SaveInsightButton({
       toast({ title: "Error", description: "Failed to save insight", variant: "destructive" });
     } else {
       setSaved(true);
-      toast({ title: "Saved!", description: `${featureName} insight saved to project` });
+      toast({ title: "Saved!", description: `${featureName} insight saved with full content` });
       onSaved?.();
     }
     setSaving(false);

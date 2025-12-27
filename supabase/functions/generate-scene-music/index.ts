@@ -10,29 +10,16 @@ interface RequestBody {
   mood?: string;
   genre?: string;
   duration?: number;
+  useAlternative?: boolean;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!ELEVENLABS_API_KEY) {
-      // Return a helpful message about needing to configure the API key
-      return new Response(
-        JSON.stringify({ 
-          error: 'Music generation requires an ElevenLabs API key. Please add ELEVENLABS_API_KEY to your project secrets.',
-          needsApiKey: true,
-          success: false 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { prompt, mood, genre, duration = 30 }: RequestBody = await req.json();
+    const { prompt, mood, genre, duration = 30, useAlternative = false }: RequestBody = await req.json();
     
     if (!prompt || prompt.trim().length === 0) {
       throw new Error('Please provide a scene description for music generation');
@@ -50,65 +37,125 @@ serve(async (req) => {
     }
     musicPrompt += `. Professional orchestral film score quality, emotional and evocative.`;
 
-    const response = await fetch('https://api.elevenlabs.io/v1/music', {
+    // Try ElevenLabs first if not using alternative
+    if (!useAlternative) {
+      const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+      
+      if (ELEVENLABS_API_KEY) {
+        const response = await fetch('https://api.elevenlabs.io/v1/music', {
+          method: 'POST',
+          headers: {
+            'xi-api-key': ELEVENLABS_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: musicPrompt,
+            duration_seconds: Math.min(Math.max(duration, 5), 60),
+          }),
+        });
+
+        if (response.ok) {
+          const audioBuffer = await response.arrayBuffer();
+          const { encode: base64Encode } = await import("https://deno.land/std@0.168.0/encoding/base64.ts");
+          const base64Audio = base64Encode(audioBuffer);
+
+          console.log(`Successfully generated scene music with ElevenLabs`);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              audioContent: base64Audio,
+              prompt: musicPrompt,
+              duration,
+              source: 'elevenlabs',
+              timestamp: new Date().toISOString(),
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // If ElevenLabs fails with 402, fall through to alternative
+        if (response.status !== 402) {
+          const errorText = await response.text();
+          console.error(`ElevenLabs error: ${response.status} - ${errorText}`);
+          
+          if (response.status === 401) {
+            throw new Error('Invalid ElevenLabs API key');
+          }
+          if (response.status === 429) {
+            throw new Error('Rate limit exceeded. Please try again later.');
+          }
+        }
+        
+        console.log('ElevenLabs requires paid plan, using alternative...');
+      }
+    }
+
+    // Alternative: Use Lovable AI to generate a detailed music description/composition
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    
+    if (!LOVABLE_API_KEY) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Music generation unavailable. Please configure API keys.',
+          needsApiKey: true,
+          success: false 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Generate a detailed music composition description using AI
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'xi-api-key': ELEVENLABS_API_KEY,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        prompt: musicPrompt,
-        duration_seconds: Math.min(Math.max(duration, 5), 60), // Between 5 and 60 seconds
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional film composer and music director. Create a detailed music composition guide for a scene. Include:
+- Tempo (BPM) and time signature
+- Key and mode
+- Primary instruments and their roles
+- Melodic themes and motifs
+- Harmonic progression
+- Dynamic changes throughout
+- Emotional arc
+- Reference tracks from famous films
+
+Format as a professional music brief that a composer could use to create the actual score.`
+          },
+          {
+            role: 'user',
+            content: `Create a detailed music composition guide for this scene:\n\n${musicPrompt}`
+          }
+        ],
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`ElevenLabs error: ${response.status} - ${errorText}`);
-      
-      if (response.status === 401) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid ElevenLabs API key. Please check your configuration.' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'ElevenLabs Music API requires a paid subscription. Please upgrade your ElevenLabs plan to use music generation.',
-            needsPaidPlan: true,
-            success: false 
-          }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw new Error(`Music generation failed: ${response.status}`);
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI composition error:', errorText);
+      throw new Error('Failed to generate music composition');
     }
 
-    // Get the audio as array buffer and convert to base64
-    const audioBuffer = await response.arrayBuffer();
-    
-    // Use Deno's encoding library for base64
-    const { encode: base64Encode } = await import("https://deno.land/std@0.168.0/encoding/base64.ts");
-    const base64Audio = base64Encode(audioBuffer);
+    const aiData = await aiResponse.json();
+    const compositionGuide = aiData.choices?.[0]?.message?.content || '';
 
-    console.log(`Successfully generated scene music`);
+    console.log('Successfully generated music composition guide');
 
     return new Response(
       JSON.stringify({
         success: true,
-        audioContent: base64Audio,
+        compositionGuide,
         prompt: musicPrompt,
         duration,
+        source: 'ai_composition',
+        isGuide: true,
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

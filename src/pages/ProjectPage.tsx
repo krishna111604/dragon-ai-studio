@@ -63,6 +63,7 @@ export default function ProjectPage() {
   const [musicTitle, setMusicTitle] = useState("");
   const [generatingMusic, setGeneratingMusic] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
+  const [compositionGuide, setCompositionGuide] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [savingMusic, setSavingMusic] = useState(false);
@@ -198,6 +199,7 @@ export default function ProjectPage() {
     }
 
     setGeneratingMusic(true);
+    setCompositionGuide(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-scene-music", {
         body: {
@@ -211,22 +213,22 @@ export default function ProjectPage() {
       if (error) throw error;
       if (data.error) {
         if (data.needsApiKey) {
-          toast({ title: "API Key Required", description: "Please add ELEVENLABS_API_KEY to your project secrets", variant: "destructive" });
-        } else if (data.needsPaidPlan) {
-          toast({ 
-            title: "Paid Plan Required", 
-            description: "ElevenLabs Music API requires a paid subscription. Please upgrade your ElevenLabs plan.", 
-            variant: "destructive" 
-          });
+          toast({ title: "API Key Required", description: "Please configure your API keys", variant: "destructive" });
         } else {
           throw new Error(data.error);
         }
         return;
       }
 
-      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
-      setGeneratedAudio(audioUrl);
-      toast({ title: "Music Generated", description: "Your scene music is ready to play!" });
+      // Check if we got actual audio or a composition guide
+      if (data.audioContent) {
+        const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+        setGeneratedAudio(audioUrl);
+        toast({ title: "Music Generated", description: "Your scene music is ready to play!" });
+      } else if (data.compositionGuide) {
+        setCompositionGuide(data.compositionGuide);
+        toast({ title: "Composition Guide Created", description: "AI has created a detailed music composition guide for your scene." });
+      }
     } catch (error: any) {
       toast({ title: "Generation Error", description: error.message || "Failed to generate music", variant: "destructive" });
     }
@@ -234,30 +236,32 @@ export default function ProjectPage() {
   };
 
   const saveGeneratedMusic = async () => {
-    if (!generatedAudio || !user || !id) return;
+    if ((!generatedAudio && !compositionGuide) || !user || !id) return;
     
     setSavingMusic(true);
     try {
+      const mediaUrl = generatedAudio || `composition:${compositionGuide?.substring(0, 500)}`;
       const { error } = await supabase.from("scene_media").insert({
         project_id: id,
         user_id: user.id,
-        media_type: "music",
-        title: musicTitle || "Scene Music",
+        media_type: generatedAudio ? "music" : "composition",
+        title: musicTitle || (generatedAudio ? "Scene Music" : "Music Composition Guide"),
         prompt: musicPrompt,
-        media_url: generatedAudio,
+        media_url: mediaUrl,
         mood: musicMood,
       });
 
       if (error) throw error;
       
-      toast({ title: "Saved", description: "Music saved to project" });
+      toast({ title: "Saved", description: generatedAudio ? "Music saved to project" : "Composition guide saved" });
       setMediaRefresh(prev => prev + 1);
       setGeneratedAudio(null);
+      setCompositionGuide(null);
       setMusicPrompt("");
       setMusicMood("");
       setMusicTitle("");
     } catch (error: any) {
-      toast({ title: "Error", description: "Failed to save music", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save", variant: "destructive" });
     }
     setSavingMusic(false);
   };
@@ -340,6 +344,8 @@ export default function ProjectPage() {
                   featureId="oracle_prediction"
                   featureName="The Oracle"
                   analysisData={aiResults["oracle_prediction"]}
+                  scriptContent={scriptContent}
+                  sceneDescription={sceneDescription}
                   onSaved={() => setInsightRefresh(prev => prev + 1)}
                 />
                 <Button variant="outline" size="sm" onClick={() => copyResults("oracle_prediction")}>
@@ -445,6 +451,20 @@ export default function ProjectPage() {
             </Button>
           </div>
         )}
+        {compositionGuide && !generatedAudio && (
+          <div className="mt-4 space-y-3">
+            <div className="p-4 bg-muted/30 rounded-lg max-h-[300px] overflow-auto">
+              <h4 className="font-semibold text-sm mb-2 text-primary">AI Composition Guide</h4>
+              <div className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">
+                {compositionGuide}
+              </div>
+            </div>
+            <Button onClick={saveGeneratedMusic} disabled={savingMusic} className="w-full" variant="outline">
+              {savingMusic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+              Save Composition Guide
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Saved Media */}
@@ -539,6 +559,8 @@ export default function ProjectPage() {
                               featureId={feature.id}
                               featureName={feature.name}
                               analysisData={aiResults[feature.id]}
+                              scriptContent={scriptContent}
+                              sceneDescription={sceneDescription}
                               onSaved={() => setInsightRefresh(prev => prev + 1)}
                             />
                             <Button variant="outline" size="sm" onClick={() => copyResults(feature.id)}>
