@@ -1,28 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, useMotionValue, useSpring, animate } from "framer-motion";
-
-interface Point {
-  x: number;
-  y: number;
-}
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 export function DragonAnimation() {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [isLowPower, setIsLowPower] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  
-  // Motion values for smooth animation
-  const dragonX = useMotionValue(0);
-  const dragonY = useMotionValue(0);
-  const dragonRotation = useMotionValue(0);
-  
-  // Smooth spring physics
-  const springX = useSpring(dragonX, { stiffness: 30, damping: 20 });
-  const springY = useSpring(dragonY, { stiffness: 30, damping: 20 });
-  const springRotation = useSpring(dragonRotation, { stiffness: 40, damping: 25 });
 
-  // Check for reduced motion preference
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
@@ -30,7 +12,6 @@ export function DragonAnimation() {
     const handleChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     
-    // Check for low-power mode (battery saver)
     if ('getBattery' in navigator) {
       (navigator as any).getBattery?.().then((battery: any) => {
         setIsLowPower(battery.level < 0.2 && !battery.charging);
@@ -40,104 +21,6 @@ export function DragonAnimation() {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Update dimensions
-  useEffect(() => {
-    const updateDimensions = () => {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-    };
-    
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
-
-  // Animation loop
-  useEffect(() => {
-    if (prefersReducedMotion || isLowPower || dimensions.width === 0) return;
-
-    const { width, height } = dimensions;
-    const margin = 50;
-    
-    // Define flight paths
-    const borderPath: Point[] = [
-      { x: margin, y: margin },
-      { x: width - margin, y: margin },
-      { x: width - margin, y: height - margin },
-      { x: margin, y: height - margin },
-    ];
-
-    const sectionPath: Point[] = [
-      { x: width * 0.2, y: height * 0.3 },
-      { x: width * 0.5, y: height * 0.2 },
-      { x: width * 0.8, y: height * 0.4 },
-      { x: width * 0.6, y: height * 0.7 },
-      { x: width * 0.3, y: height * 0.6 },
-    ];
-
-    let currentPathIndex = 0;
-    let isBorderMode = true;
-    let animationId: number;
-    let lastTime = 0;
-    const speed = 0.15;
-
-    const getPath = () => isBorderMode ? borderPath : sectionPath;
-    
-    const animateDragon = (timestamp: number) => {
-      if (!lastTime) lastTime = timestamp;
-      const delta = timestamp - lastTime;
-      
-      if (delta > 16) { // ~60fps cap
-        const path = getPath();
-        const currentPoint = path[currentPathIndex];
-        const nextIndex = (currentPathIndex + 1) % path.length;
-        const nextPoint = path[nextIndex];
-        
-        const currentX = dragonX.get();
-        const currentY = dragonY.get();
-        
-        const dx = nextPoint.x - currentX;
-        const dy = nextPoint.y - currentY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < 20) {
-          currentPathIndex = nextIndex;
-          
-          // Switch modes occasionally
-          if (nextIndex === 0) {
-            isBorderMode = !isBorderMode;
-          }
-        } else {
-          const moveX = (dx / distance) * speed * delta;
-          const moveY = (dy / distance) * speed * delta;
-          
-          dragonX.set(currentX + moveX);
-          dragonY.set(currentY + moveY);
-          
-          // Calculate rotation based on movement direction
-          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          dragonRotation.set(angle);
-        }
-        
-        lastTime = timestamp;
-      }
-      
-      animationId = requestAnimationFrame(animateDragon);
-    };
-
-    // Start animation
-    dragonX.set(margin);
-    dragonY.set(margin);
-    animationId = requestAnimationFrame(animateDragon);
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-    };
-  }, [dimensions, prefersReducedMotion, isLowPower, dragonX, dragonY, dragonRotation]);
-
-  // Static fallback for reduced motion
   if (prefersReducedMotion || isLowPower) {
     return (
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -148,213 +31,264 @@ export function DragonAnimation() {
 
   return (
     <div 
-      ref={containerRef}
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       style={{ mixBlendMode: "screen" }}
     >
-      {/* Ambient glow effects */}
-      <div className="absolute inset-0">
-        <motion.div
-          className="absolute w-96 h-96 rounded-full blur-3xl"
-          style={{
-            x: springX,
-            y: springY,
-            background: "radial-gradient(circle, hsl(0, 70%, 50%, 0.15) 0%, transparent 70%)",
-            translateX: "-50%",
-            translateY: "-50%",
-          }}
-        />
-      </div>
-
-      {/* Dragon SVG */}
-      <motion.svg
-        width="200"
-        height="80"
-        viewBox="0 0 200 80"
-        className="absolute"
-        style={{
-          x: springX,
-          y: springY,
-          rotate: springRotation,
-          translateX: "-50%",
-          translateY: "-50%",
-          opacity: 0.25,
-          filter: "blur(0.5px)",
-        }}
+      {/* Main fiery dragon border - swirling around the entire viewport */}
+      <svg 
+        className="absolute inset-0 w-full h-full"
+        viewBox="0 0 1920 1080"
+        preserveAspectRatio="none"
       >
-        {/* Dragon body - serpentine shape */}
         <defs>
-          <linearGradient id="dragonGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(0, 80%, 45%)" />
-            <stop offset="50%" stopColor="hsl(20, 90%, 50%)" />
-            <stop offset="100%" stopColor="hsl(0, 70%, 40%)" />
+          {/* Fire gradient for dragon body */}
+          <linearGradient id="fireGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ff2d00" />
+            <stop offset="25%" stopColor="#ff6a00" />
+            <stop offset="50%" stopColor="#ff4500" />
+            <stop offset="75%" stopColor="#ff2d00" />
+            <stop offset="100%" stopColor="#8b0000" />
           </linearGradient>
-          <filter id="dragonGlow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          
+          {/* Ember glow gradient */}
+          <radialGradient id="emberGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ff6a00" stopOpacity="0.8" />
+            <stop offset="50%" stopColor="#ff2d00" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#8b0000" stopOpacity="0" />
+          </radialGradient>
+          
+          {/* Intense fire glow */}
+          <filter id="fireGlow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="15" result="blur1" />
+            <feGaussianBlur stdDeviation="30" result="blur2" />
             <feMerge>
-              <feMergeNode in="blur" />
+              <feMergeNode in="blur2" />
+              <feMergeNode in="blur1" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <filter id="emberGlow">
-            <feGaussianBlur stdDeviation="2" />
+          
+          <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" />
           </filter>
         </defs>
 
-        {/* Main body */}
+        {/* Bottom-left swirling dragon */}
         <motion.path
-          d="M10 40 Q30 20 50 40 T90 40 T130 40 T170 40 Q180 40 190 35"
-          stroke="url(#dragonGradient)"
-          strokeWidth="8"
+          d="M-100,900 Q200,1100 400,950 Q600,800 500,600 Q400,400 200,500 Q0,600 100,800 Q200,1000 400,1050 Q700,1100 900,950"
+          stroke="url(#fireGradient)"
+          strokeWidth="60"
           fill="none"
           strokeLinecap="round"
-          filter="url(#dragonGlow)"
+          filter="url(#fireGlow)"
+          opacity="0.3"
           animate={{
             d: [
-              "M10 40 Q30 20 50 40 T90 40 T130 40 T170 40 Q180 40 190 35",
-              "M10 40 Q30 60 50 40 T90 40 T130 40 T170 40 Q180 40 190 45",
-              "M10 40 Q30 20 50 40 T90 40 T130 40 T170 40 Q180 40 190 35",
+              "M-100,900 Q200,1100 400,950 Q600,800 500,600 Q400,400 200,500 Q0,600 100,800 Q200,1000 400,1050 Q700,1100 900,950",
+              "M-100,950 Q200,1050 350,900 Q550,750 450,550 Q350,350 150,450 Q-50,550 50,750 Q150,950 350,1000 Q650,1050 850,900",
+              "M-100,900 Q200,1100 400,950 Q600,800 500,600 Q400,400 200,500 Q0,600 100,800 Q200,1000 400,1050 Q700,1100 900,950",
             ],
           }}
           transition={{
-            duration: 2,
+            duration: 8,
             repeat: Infinity,
             ease: "easeInOut",
           }}
         />
-
-        {/* Secondary body layer */}
+        
+        {/* Top-right swirling dragon */}
         <motion.path
-          d="M15 40 Q35 25 55 40 T95 40 T135 40 T175 40"
-          stroke="hsl(25, 90%, 55%)"
-          strokeWidth="4"
+          d="M2020,200 Q1800,-50 1600,150 Q1400,350 1500,550 Q1600,750 1800,650 Q2000,550 1900,350 Q1800,150 1600,100 Q1300,-50 1100,150"
+          stroke="url(#fireGradient)"
+          strokeWidth="55"
           fill="none"
           strokeLinecap="round"
-          opacity="0.6"
+          filter="url(#fireGlow)"
+          opacity="0.3"
           animate={{
             d: [
-              "M15 40 Q35 25 55 40 T95 40 T135 40 T175 40",
-              "M15 40 Q35 55 55 40 T95 40 T135 40 T175 40",
-              "M15 40 Q35 25 55 40 T95 40 T135 40 T175 40",
+              "M2020,200 Q1800,-50 1600,150 Q1400,350 1500,550 Q1600,750 1800,650 Q2000,550 1900,350 Q1800,150 1600,100 Q1300,-50 1100,150",
+              "M2020,150 Q1750,0 1550,200 Q1350,400 1450,600 Q1550,800 1750,700 Q1950,600 1850,400 Q1750,200 1550,150 Q1250,0 1050,200",
+              "M2020,200 Q1800,-50 1600,150 Q1400,350 1500,550 Q1600,750 1800,650 Q2000,550 1900,350 Q1800,150 1600,100 Q1300,-50 1100,150",
             ],
           }}
           transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.1,
-          }}
-        />
-
-        {/* Head */}
-        <motion.ellipse
-          cx="190"
-          cy="38"
-          rx="10"
-          ry="6"
-          fill="hsl(0, 75%, 45%)"
-          filter="url(#dragonGlow)"
-        />
-
-        {/* Wings */}
-        <motion.path
-          d="M60 40 Q70 15 90 25 L80 40"
-          fill="hsl(0, 70%, 50%)"
-          opacity="0.7"
-          filter="url(#dragonGlow)"
-          animate={{
-            d: [
-              "M60 40 Q70 15 90 25 L80 40",
-              "M60 40 Q70 5 90 20 L80 40",
-              "M60 40 Q70 15 90 25 L80 40",
-            ],
-          }}
-          transition={{
-            duration: 0.8,
+            duration: 10,
             repeat: Infinity,
             ease: "easeInOut",
           }}
         />
-        <motion.path
-          d="M120 40 Q130 15 150 25 L140 40"
-          fill="hsl(0, 70%, 50%)"
-          opacity="0.7"
-          filter="url(#dragonGlow)"
-          animate={{
-            d: [
-              "M120 40 Q130 15 150 25 L140 40",
-              "M120 40 Q130 5 150 20 L140 40",
-              "M120 40 Q130 15 150 25 L140 40",
-            ],
-          }}
-          transition={{
-            duration: 0.8,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: 0.15,
-          }}
-        />
 
-        {/* Tail */}
+        {/* Inner fire layer - bottom left */}
         <motion.path
-          d="M10 40 Q0 30 5 20"
-          stroke="hsl(0, 75%, 45%)"
-          strokeWidth="4"
+          d="M-50,850 Q250,1050 450,900 Q650,750 550,550 Q450,350 250,450 Q50,550 150,750 Q250,950 450,1000"
+          stroke="#ff6a00"
+          strokeWidth="30"
           fill="none"
           strokeLinecap="round"
+          filter="url(#softGlow)"
+          opacity="0.25"
           animate={{
             d: [
-              "M10 40 Q0 30 5 20",
-              "M10 40 Q0 50 5 60",
-              "M10 40 Q0 30 5 20",
+              "M-50,850 Q250,1050 450,900 Q650,750 550,550 Q450,350 250,450 Q50,550 150,750 Q250,950 450,1000",
+              "M-50,900 Q250,1000 400,850 Q600,700 500,500 Q400,300 200,400 Q0,500 100,700 Q200,900 400,950",
+              "M-50,850 Q250,1050 450,900 Q650,750 550,550 Q450,350 250,450 Q50,550 150,750 Q250,950 450,1000",
             ],
           }}
           transition={{
-            duration: 1.5,
+            duration: 6,
             repeat: Infinity,
             ease: "easeInOut",
+            delay: 0.5,
           }}
         />
 
-        {/* Ember particles */}
-        {[0, 1, 2, 3, 4].map((i) => (
-          <motion.circle
-            key={i}
-            r="2"
-            fill="hsl(30, 100%, 60%)"
-            filter="url(#emberGlow)"
-            animate={{
-              cx: [50 + i * 30, 55 + i * 30, 50 + i * 30],
-              cy: [45, 35, 45],
-              opacity: [0.8, 0.3, 0.8],
-              scale: [1, 0.5, 1],
-            }}
-            transition={{
-              duration: 1.5 + i * 0.2,
-              repeat: Infinity,
-              ease: "easeInOut",
-              delay: i * 0.3,
-            }}
-          />
-        ))}
-      </motion.svg>
+        {/* Inner fire layer - top right */}
+        <motion.path
+          d="M1970,250 Q1750,0 1550,200 Q1350,400 1450,600 Q1550,800 1750,700 Q1950,600 1850,400"
+          stroke="#ff6a00"
+          strokeWidth="25"
+          fill="none"
+          strokeLinecap="round"
+          filter="url(#softGlow)"
+          opacity="0.25"
+          animate={{
+            d: [
+              "M1970,250 Q1750,0 1550,200 Q1350,400 1450,600 Q1550,800 1750,700 Q1950,600 1850,400",
+              "M1970,200 Q1700,50 1500,250 Q1300,450 1400,650 Q1500,850 1700,750 Q1900,650 1800,450",
+              "M1970,250 Q1750,0 1550,200 Q1350,400 1450,600 Q1550,800 1750,700 Q1950,600 1850,400",
+            ],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 0.3,
+          }}
+        />
 
-      {/* Trailing ember particles */}
-      {[0, 1, 2].map((i) => (
+        {/* Bright core - bottom left */}
+        <motion.path
+          d="M0,880 Q300,1080 500,930 Q700,780 600,580 Q500,380 300,480 Q100,580 200,780"
+          stroke="#ffaa00"
+          strokeWidth="12"
+          fill="none"
+          strokeLinecap="round"
+          filter="url(#softGlow)"
+          opacity="0.35"
+          animate={{
+            d: [
+              "M0,880 Q300,1080 500,930 Q700,780 600,580 Q500,380 300,480 Q100,580 200,780",
+              "M0,930 Q300,1030 450,880 Q650,730 550,530 Q450,330 250,430 Q50,530 150,730",
+              "M0,880 Q300,1080 500,930 Q700,780 600,580 Q500,380 300,480 Q100,580 200,780",
+            ],
+          }}
+          transition={{
+            duration: 5,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 0.2,
+          }}
+        />
+
+        {/* Bright core - top right */}
+        <motion.path
+          d="M1950,220 Q1720,20 1520,220 Q1320,420 1420,620 Q1520,820 1720,720"
+          stroke="#ffaa00"
+          strokeWidth="10"
+          fill="none"
+          strokeLinecap="round"
+          filter="url(#softGlow)"
+          opacity="0.35"
+          animate={{
+            d: [
+              "M1950,220 Q1720,20 1520,220 Q1320,420 1420,620 Q1520,820 1720,720",
+              "M1950,170 Q1670,70 1470,270 Q1270,470 1370,670 Q1470,870 1670,770",
+              "M1950,220 Q1720,20 1520,220 Q1320,420 1420,620 Q1520,820 1720,720",
+            ],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: 0.4,
+          }}
+        />
+      </svg>
+
+      {/* Floating ember particles - bottom left */}
+      {[...Array(12)].map((_, i) => (
         <motion.div
-          key={`ember-${i}`}
-          className="absolute w-2 h-2 rounded-full"
+          key={`ember-bl-${i}`}
+          className="absolute rounded-full"
           style={{
-            x: springX,
-            y: springY,
-            translateX: -100 - i * 40,
-            translateY: Math.sin(i) * 20,
-            background: `radial-gradient(circle, hsl(${20 + i * 10}, 100%, 60%) 0%, transparent 70%)`,
-            opacity: 0.4 - i * 0.1,
-            filter: "blur(2px)",
+            width: 4 + Math.random() * 8,
+            height: 4 + Math.random() * 8,
+            left: `${5 + Math.random() * 30}%`,
+            bottom: `${5 + Math.random() * 35}%`,
+            background: `radial-gradient(circle, ${
+              i % 3 === 0 ? '#ffaa00' : i % 3 === 1 ? '#ff6a00' : '#ff2d00'
+            } 0%, transparent 70%)`,
+            filter: "blur(1px)",
+          }}
+          animate={{
+            y: [0, -30 - Math.random() * 50, 0],
+            x: [0, (Math.random() - 0.5) * 40, 0],
+            opacity: [0.6, 0.2, 0.6],
+            scale: [1, 0.6, 1],
+          }}
+          transition={{
+            duration: 3 + Math.random() * 3,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: Math.random() * 2,
           }}
         />
       ))}
+
+      {/* Floating ember particles - top right */}
+      {[...Array(12)].map((_, i) => (
+        <motion.div
+          key={`ember-tr-${i}`}
+          className="absolute rounded-full"
+          style={{
+            width: 4 + Math.random() * 8,
+            height: 4 + Math.random() * 8,
+            right: `${5 + Math.random() * 30}%`,
+            top: `${5 + Math.random() * 35}%`,
+            background: `radial-gradient(circle, ${
+              i % 3 === 0 ? '#ffaa00' : i % 3 === 1 ? '#ff6a00' : '#ff2d00'
+            } 0%, transparent 70%)`,
+            filter: "blur(1px)",
+          }}
+          animate={{
+            y: [0, 30 + Math.random() * 50, 0],
+            x: [0, (Math.random() - 0.5) * 40, 0],
+            opacity: [0.6, 0.2, 0.6],
+            scale: [1, 0.6, 1],
+          }}
+          transition={{
+            duration: 3 + Math.random() * 3,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: Math.random() * 2,
+          }}
+        />
+      ))}
+
+      {/* Ambient glow overlays */}
+      <div 
+        className="absolute bottom-0 left-0 w-1/2 h-1/2 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at 20% 80%, rgba(255, 45, 0, 0.15) 0%, transparent 60%)",
+        }}
+      />
+      <div 
+        className="absolute top-0 right-0 w-1/2 h-1/2 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at 80% 20%, rgba(255, 45, 0, 0.15) 0%, transparent 60%)",
+        }}
+      />
     </div>
   );
 }
