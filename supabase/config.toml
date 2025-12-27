@@ -1,0 +1,4 @@
+project_id = "zzlobnmoekubnqnhzxzn"
+
+[functions.dragon-ai]
+verify_jwt = true
