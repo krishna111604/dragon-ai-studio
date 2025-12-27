@@ -73,6 +73,17 @@ serve(async (req) => {
         );
       }
       
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ 
+            error: 'ElevenLabs Music API requires a paid subscription. Please upgrade your ElevenLabs plan to use music generation.',
+            needsPaidPlan: true,
+            success: false 
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),

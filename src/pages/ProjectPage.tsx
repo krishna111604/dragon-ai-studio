@@ -212,6 +212,12 @@ export default function ProjectPage() {
       if (data.error) {
         if (data.needsApiKey) {
           toast({ title: "API Key Required", description: "Please add ELEVENLABS_API_KEY to your project secrets", variant: "destructive" });
+        } else if (data.needsPaidPlan) {
+          toast({ 
+            title: "Paid Plan Required", 
+            description: "ElevenLabs Music API requires a paid subscription. Please upgrade your ElevenLabs plan.", 
+            variant: "destructive" 
+          });
         } else {
           throw new Error(data.error);
         }
