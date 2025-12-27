@@ -31,6 +31,7 @@ export function SavedMediaList({ projectId, mediaType = "all", refreshTrigger }:
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -105,8 +106,6 @@ export function SavedMediaList({ projectId, mediaType = "all", refreshTrigger }:
       </div>
     );
   }
-
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const isComposition = (item: SceneMedia) => item.media_type === "composition" || item.media_url.startsWith("composition:");
 
