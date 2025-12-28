@@ -6,7 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Image, Loader2, Download, Trash2 } from "lucide-react";
+import { Image, Loader2, Download, Trash2, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SceneMedia {
   id: string;
@@ -14,6 +21,13 @@ interface SceneMedia {
   prompt: string;
   media_url: string;
   created_at: string;
+}
+
+interface Character {
+  id: string;
+  name: string;
+  description: string;
+  appearance_details: string | null;
 }
 
 interface SceneVisualizerEmbedProps {
@@ -26,6 +40,8 @@ interface SceneVisualizerEmbedProps {
 export function SceneVisualizerEmbed({ projectId, projectName, genre, onMediaSaved }: SceneVisualizerEmbedProps) {
   const { user } = useAuth();
   const [savedImages, setSavedImages] = useState<SceneMedia[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [selectedCharacter, setSelectedCharacter] = useState<string>("");
   
   const [imagePrompt, setImagePrompt] = useState("");
   const [imageTitle, setImageTitle] = useState("");
@@ -37,7 +53,20 @@ export function SceneVisualizerEmbed({ projectId, projectName, genre, onMediaSav
 
   useEffect(() => {
     fetchSavedImages();
+    fetchCharacters();
   }, [projectId]);
+
+  const fetchCharacters = async () => {
+    const { data, error } = await supabase
+      .from("project_characters")
+      .select("id, name, description, appearance_details")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+    
+    if (!error && data) {
+      setCharacters(data as Character[]);
+    }
+  };
 
   const fetchSavedImages = async () => {
     const { data, error } = await supabase
@@ -61,9 +90,21 @@ export function SceneVisualizerEmbed({ projectId, projectName, genre, onMediaSav
 
     setGeneratingImage(true);
     try {
+      // Build prompt with character consistency
+      let fullPrompt = imagePrompt;
+      if (selectedCharacter) {
+        const character = characters.find(c => c.id === selectedCharacter);
+        if (character) {
+          fullPrompt = `${imagePrompt}. Include character: ${character.name} - ${character.description}`;
+          if (character.appearance_details) {
+            fullPrompt += `. Physical appearance: ${character.appearance_details}`;
+          }
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-scene-image", {
         body: {
-          prompt: imagePrompt,
+          prompt: fullPrompt,
           projectName,
           genre,
         },
@@ -157,6 +198,28 @@ export function SceneVisualizerEmbed({ projectId, projectName, genre, onMediaSav
               className="min-h-[100px] bg-muted/50 border-border"
             />
           </div>
+
+          {characters.length > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Include Character (for consistency)
+              </label>
+              <Select value={selectedCharacter} onValueChange={setSelectedCharacter}>
+                <SelectTrigger className="bg-muted/50 border-border">
+                  <SelectValue placeholder="Select a character (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {characters.map((char) => (
+                    <SelectItem key={char.id} value={char.id}>
+                      {char.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           
           <Button 
             onClick={generateSceneImage} 

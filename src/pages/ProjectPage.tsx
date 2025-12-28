@@ -18,6 +18,11 @@ import { StoryboardView } from "@/components/StoryboardView";
 import { SavedMediaList } from "@/components/SavedMediaList";
 import { SceneVisualizerEmbed } from "@/components/SceneVisualizerEmbed";
 import { AudioAnalyzerEmbed } from "@/components/AudioAnalyzerEmbed";
+import { CollaborationPresence } from "@/components/CollaborationPresence";
+import { ExportPDF } from "@/components/ExportPDF";
+import { VoiceToScript } from "@/components/VoiceToScript";
+import { VersionHistory } from "@/components/VersionHistory";
+import { CharacterManager } from "@/components/CharacterManager";
 
 interface Project {
   id: string;
@@ -384,11 +389,25 @@ export default function ProjectPage() {
               <Film className="w-5 h-5 text-primary" />
               <span className="font-semibold">{project.name}</span>
             </div>
+            <CollaborationPresence projectId={id!} />
           </div>
-          <Button onClick={saveProject} disabled={saving} className="bg-gradient-gold text-primary-foreground">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-            Save
-          </Button>
+          <div className="flex items-center gap-2">
+            <CharacterManager projectId={id!} />
+            <VersionHistory 
+              projectId={id!}
+              currentScriptContent={scriptContent}
+              currentSceneDescription={sceneDescription}
+              onRestore={(script, scene) => {
+                setScriptContent(script);
+                setSceneDescription(scene);
+              }}
+            />
+            <ExportPDF projectId={id!} projectName={project.name} />
+            <Button onClick={saveProject} disabled={saving} className="bg-gradient-gold text-primary-foreground">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              Save
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -402,20 +421,30 @@ export default function ProjectPage() {
           {/* Left Column - Script Input */}
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             <div className="card-cinematic rounded-xl p-6">
-              <h3 className="font-semibold mb-4">Script Content</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Script Content</h3>
+                <VoiceToScript 
+                  onTranscript={(text) => setScriptContent(prev => prev + (prev ? ' ' : '') + text)}
+                />
+              </div>
               <Textarea 
                 value={scriptContent}
                 onChange={(e) => setScriptContent(e.target.value)}
-                placeholder="Paste your script here..."
+                placeholder="Paste your script here or use voice input..."
                 className="min-h-[200px] bg-muted/50 border-border"
               />
             </div>
             <div className="card-cinematic rounded-xl p-6">
-              <h3 className="font-semibold mb-4">Scene Description</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Scene Description</h3>
+                <VoiceToScript 
+                  onTranscript={(text) => setSceneDescription(prev => prev + (prev ? ' ' : '') + text)}
+                />
+              </div>
               <Textarea 
                 value={sceneDescription}
                 onChange={(e) => setSceneDescription(e.target.value)}
-                placeholder="Describe the scene you want to analyze..."
+                placeholder="Describe the scene or use voice input..."
                 className="min-h-[120px] bg-muted/50 border-border"
               />
             </div>
