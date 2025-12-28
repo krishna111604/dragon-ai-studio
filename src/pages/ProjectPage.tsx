@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Image
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
@@ -16,6 +16,8 @@ import { SavedInsightsList } from "@/components/SavedInsightsList";
 import { DragonAnimation } from "@/components/DragonAnimation";
 import { StoryboardView } from "@/components/StoryboardView";
 import { SavedMediaList } from "@/components/SavedMediaList";
+import { SceneVisualizerEmbed } from "@/components/SceneVisualizerEmbed";
+import { AudioAnalyzerEmbed } from "@/components/AudioAnalyzerEmbed";
 
 interface Project {
   id: string;
@@ -28,11 +30,11 @@ interface Project {
 
 const aiFeatures = [
   { id: "script_analysis", icon: Sparkles, name: "Script Analyzer", desc: "Analyze story structure and emotional arc" },
-  { id: "directors_lens", icon: Clapperboard, name: "Director's Lens", desc: "Get cinematic suggestions" },
+  { id: "directors_lens", icon: Clapperboard, name: "Director's Lens", desc: "Scene visualization & cinematic suggestions" },
   { id: "dream_weaver", icon: Brain, name: "Dream Weaver", desc: "Creative brainstorming" },
-  { id: "emotional_arc", icon: Music, name: "Emotional Arc", desc: "Music & sound suggestions" },
+  { id: "audio_analyzer", icon: Music, name: "Audio Analyzer", desc: "Scene music generation & audio suggestions" },
   { id: "film_historian", icon: BookOpen, name: "Film Historian", desc: "Find references & inspirations" },
-  { id: "oracle_prediction", icon: TrendingUp, name: "The Oracle", desc: "Predictive analytics & creative tools" },
+  { id: "oracle_prediction", icon: TrendingUp, name: "The Oracle", desc: "Predictive analytics & saved media" },
 ];
 
 export default function ProjectPage() {
@@ -220,41 +222,149 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      {/* Quick Links to Generators */}
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Link to={`/project/${id}/visualizer`}>
-          <div className="card-cinematic rounded-xl p-5 hover:border-primary/50 transition-colors cursor-pointer group">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
-                <Image className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="font-semibold">Scene Visualizer</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Generate AI-powered visual concepts and storyboard images for your scenes
-            </p>
-          </div>
-        </Link>
-        
-        <Link to={`/project/${id}/music`}>
-          <div className="card-cinematic rounded-xl p-5 hover:border-primary/50 transition-colors cursor-pointer group">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
-                <Music className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="font-semibold">Scene Music Generator</h3>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Create AI music compositions and detailed composition guides for your scenes
-            </p>
-          </div>
-        </Link>
-      </div>
-
       {/* Saved Media */}
       <div className="card-cinematic rounded-xl p-5">
         <h3 className="font-semibold mb-3">Saved Media</h3>
         <SavedMediaList projectId={id!} refreshTrigger={mediaRefresh} />
+      </div>
+    </div>
+  );
+
+  const renderDirectorsLensContent = () => (
+    <div className="space-y-6">
+      {/* AI Analysis Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Clapperboard className="w-5 h-5 text-primary" />
+              Cinematic Analysis
+            </h3>
+            <p className="text-sm text-muted-foreground">Get cinematic suggestions for your scenes</p>
+          </div>
+          <div className="flex gap-2">
+            {aiResults["directors_lens"] && (
+              <>
+                <SaveInsightButton
+                  projectId={id!}
+                  featureId="directors_lens"
+                  featureName="Director's Lens"
+                  analysisData={aiResults["directors_lens"]}
+                  scriptContent={scriptContent}
+                  sceneDescription={sceneDescription}
+                  onSaved={() => setInsightRefresh(prev => prev + 1)}
+                />
+                <Button variant="outline" size="sm" onClick={() => copyResults("directors_lens")}>
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </>
+            )}
+            <Button 
+              onClick={() => runAiFeature("directors_lens")}
+              disabled={aiLoading === "directors_lens"}
+              className="bg-gradient-gold text-primary-foreground"
+            >
+              {aiLoading === "directors_lens" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Analyze
+            </Button>
+          </div>
+        </div>
+        
+        <div className="min-h-[120px] max-h-[200px] bg-muted/30 rounded-lg p-4 overflow-auto mb-6">
+          {aiLoading === "directors_lens" ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">AI is analyzing...</p>
+              </div>
+            </div>
+          ) : aiResults["directors_lens"] ? (
+            renderAnalysis(aiResults["directors_lens"])
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Click Analyze to get cinematic insights</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Scene Visualizer */}
+      <div className="card-cinematic rounded-xl p-5">
+        <SceneVisualizerEmbed 
+          projectId={id!} 
+          projectName={project?.name}
+          genre={project?.genre}
+          onMediaSaved={() => setMediaRefresh(prev => prev + 1)}
+        />
+      </div>
+    </div>
+  );
+
+  const renderAudioAnalyzerContent = () => (
+    <div className="space-y-6">
+      {/* AI Analysis Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Music className="w-5 h-5 text-primary" />
+              Audio Analysis
+            </h3>
+            <p className="text-sm text-muted-foreground">Get music & sound suggestions</p>
+          </div>
+          <div className="flex gap-2">
+            {aiResults["audio_analyzer"] && (
+              <>
+                <SaveInsightButton
+                  projectId={id!}
+                  featureId="audio_analyzer"
+                  featureName="Audio Analyzer"
+                  analysisData={aiResults["audio_analyzer"]}
+                  scriptContent={scriptContent}
+                  sceneDescription={sceneDescription}
+                  onSaved={() => setInsightRefresh(prev => prev + 1)}
+                />
+                <Button variant="outline" size="sm" onClick={() => copyResults("audio_analyzer")}>
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </>
+            )}
+            <Button 
+              onClick={() => runAiFeature("audio_analyzer")}
+              disabled={aiLoading === "audio_analyzer"}
+              className="bg-gradient-gold text-primary-foreground"
+            >
+              {aiLoading === "audio_analyzer" ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Analyze
+            </Button>
+          </div>
+        </div>
+        
+        <div className="min-h-[120px] max-h-[200px] bg-muted/30 rounded-lg p-4 overflow-auto mb-6">
+          {aiLoading === "audio_analyzer" ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">AI is analyzing...</p>
+              </div>
+            </div>
+          ) : aiResults["audio_analyzer"] ? (
+            renderAnalysis(aiResults["audio_analyzer"])
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Click Analyze to get audio insights</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Scene Music Generator */}
+      <div className="card-cinematic rounded-xl p-5">
+        <AudioAnalyzerEmbed 
+          projectId={id!} 
+          genre={project?.genre}
+          onMediaSaved={() => setMediaRefresh(prev => prev + 1)}
+        />
       </div>
     </div>
   );
@@ -324,7 +434,7 @@ export default function ProjectPage() {
                 ))}
               </TabsList>
 
-              {aiFeatures.filter(f => f.id !== "oracle_prediction").map((feature) => (
+              {aiFeatures.filter(f => !["oracle_prediction", "directors_lens", "audio_analyzer"].includes(f.id)).map((feature) => (
                 <TabsContent key={feature.id} value={feature.id}>
                   <div className="card-cinematic rounded-xl p-6">
                     <div className="flex items-center justify-between mb-4">
@@ -383,7 +493,21 @@ export default function ProjectPage() {
                 </TabsContent>
               ))}
 
-              {/* The Oracle Tab with Generators */}
+              {/* Director's Lens Tab with Visualizer */}
+              <TabsContent value="directors_lens">
+                <div className="card-cinematic rounded-xl p-6 max-h-[80vh] overflow-auto">
+                  {renderDirectorsLensContent()}
+                </div>
+              </TabsContent>
+
+              {/* Audio Analyzer Tab with Music Generator */}
+              <TabsContent value="audio_analyzer">
+                <div className="card-cinematic rounded-xl p-6 max-h-[80vh] overflow-auto">
+                  {renderAudioAnalyzerContent()}
+                </div>
+              </TabsContent>
+
+              {/* The Oracle Tab */}
               <TabsContent value="oracle_prediction">
                 <div className="card-cinematic rounded-xl p-6 max-h-[80vh] overflow-auto">
                   {renderOracleContent()}
