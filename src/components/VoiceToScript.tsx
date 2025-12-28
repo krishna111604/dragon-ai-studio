@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface VoiceToScriptProps {
   onTranscript: (text: string) => void;
+  onInterimTranscript?: (text: string) => void;
   disabled?: boolean;
 }
 
@@ -18,9 +19,10 @@ interface SpeechRecognitionErrorEvent extends Event {
   error: string;
 }
 
-export function VoiceToScript({ onTranscript, disabled }: VoiceToScriptProps) {
+export function VoiceToScript({ onTranscript, onInterimTranscript, disabled }: VoiceToScriptProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -51,7 +53,12 @@ export function VoiceToScript({ onTranscript, disabled }: VoiceToScriptProps) {
         }
       }
 
+      // Show interim (live) transcription
+      setInterimText(interimTranscript);
+      onInterimTranscript?.(interimTranscript);
+
       if (finalTranscript) {
+        setInterimText("");
         onTranscript(finalTranscript.trim());
       }
     };
@@ -126,22 +133,29 @@ export function VoiceToScript({ onTranscript, disabled }: VoiceToScriptProps) {
   }
 
   return (
-    <Button
-      onClick={toggleListening}
-      disabled={disabled}
-      variant={isListening ? "destructive" : "outline"}
-      size="sm"
-      className={isListening ? "animate-pulse" : ""}
-      title={isListening ? "Stop listening" : "Start voice input"}
-    >
-      {isListening ? (
-        <>
-          <Loader2 className="w-4 h-4 animate-spin mr-1" />
-          <Mic className="w-4 h-4" />
-        </>
-      ) : (
-        <Mic className="w-4 h-4" />
+    <div className="flex items-center gap-2">
+      {isListening && interimText && (
+        <span className="text-xs text-muted-foreground italic max-w-[200px] truncate">
+          {interimText}...
+        </span>
       )}
-    </Button>
+      <Button
+        onClick={toggleListening}
+        disabled={disabled}
+        variant={isListening ? "destructive" : "outline"}
+        size="sm"
+        className={isListening ? "animate-pulse" : ""}
+        title={isListening ? "Stop listening" : "Start voice input"}
+      >
+        {isListening ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin mr-1" />
+            <Mic className="w-4 h-4" />
+          </>
+        ) : (
+          <Mic className="w-4 h-4" />
+        )}
+      </Button>
+    </div>
   );
 }
