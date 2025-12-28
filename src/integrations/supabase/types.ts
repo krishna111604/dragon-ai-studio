@@ -50,6 +50,50 @@ export type Database = {
         }
         Relationships: []
       }
+      project_characters: {
+        Row: {
+          appearance_details: string | null
+          created_at: string
+          description: string
+          id: string
+          name: string
+          project_id: string
+          reference_image_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appearance_details?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          name: string
+          project_id: string
+          reference_image_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appearance_details?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          project_id?: string
+          reference_image_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_characters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_insights: {
         Row: {
           content: Json
@@ -84,6 +128,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_insights_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_versions: {
+        Row: {
+          change_summary: string | null
+          created_at: string
+          id: string
+          project_id: string
+          scene_description: string | null
+          script_content: string | null
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string
+          id?: string
+          project_id: string
+          scene_description?: string | null
+          script_content?: string | null
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string
+          scene_description?: string | null
+          script_content?: string | null
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_versions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
