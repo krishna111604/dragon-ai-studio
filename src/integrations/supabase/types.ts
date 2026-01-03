@@ -258,6 +258,7 @@ export type Database = {
           genre: string | null
           id: string
           name: string
+          project_code: string | null
           scene_description: string | null
           script_content: string | null
           target_audience: string | null
@@ -269,6 +270,7 @@ export type Database = {
           genre?: string | null
           id?: string
           name: string
+          project_code?: string | null
           scene_description?: string | null
           script_content?: string | null
           target_audience?: string | null
@@ -280,6 +282,7 @@ export type Database = {
           genre?: string | null
           id?: string
           name?: string
+          project_code?: string | null
           scene_description?: string | null
           script_content?: string | null
           target_audience?: string | null
