@@ -30,6 +30,7 @@ interface Project {
   target_audience: string | null;
   created_at: string;
   updated_at: string;
+  project_code?: string;
 }
 
 const aiFeatures = [
@@ -235,9 +236,16 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground">
                     {project.genre || "No genre"} • {project.target_audience || "No audience set"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Updated {new Date(project.updated_at).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-xs text-muted-foreground">
+                      Updated {new Date(project.updated_at).toLocaleDateString()}
+                    </p>
+                    {project.project_code && (
+                      <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
+                        #{project.project_code}
+                      </span>
+                    )}
+                  </div>
                 </motion.div>
               ))}
             </div>

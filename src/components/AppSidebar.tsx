@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Film, LayoutDashboard, Sparkles, Settings, User, LogOut } from "lucide-react";
+import { Film, LayoutDashboard, Sparkles, Settings, User, LogOut, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/collaboration", label: "Collaboration", icon: Users },
   { path: "/insights", label: "Insights", icon: Sparkles },
   { path: "/profile", label: "Settings", icon: Settings },
 ];

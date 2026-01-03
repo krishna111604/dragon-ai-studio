@@ -142,10 +142,11 @@ export default function CollaborationPage() {
               .select('name, project_code')
               .eq('id', collab.project_id)
               .maybeSingle();
+            const projectData = project as { name?: string; project_code?: string } | null;
             return { 
               ...collab, 
-              project_name: project?.name || 'Unknown Project',
-              project_code: project?.project_code
+              project_name: projectData?.name || 'Unknown Project',
+              project_code: projectData?.project_code
             };
           })
         );
@@ -164,11 +165,13 @@ export default function CollaborationPage() {
 
     try {
       // Find project by code
-      const { data: project, error: projectError } = await supabase
+      const { data: projectResult, error: projectError } = await (supabase
         .from('projects')
-        .select('id, user_id, name')
+        .select('id, user_id, name') as any)
         .eq('project_code', projectCode.trim())
         .maybeSingle();
+
+      const project = projectResult as { id: string; user_id: string; name: string } | null;
 
       if (projectError || !project) {
         toast({

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Share2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
@@ -19,10 +19,14 @@ import { SavedMediaList } from "@/components/SavedMediaList";
 import { SceneVisualizerEmbed } from "@/components/SceneVisualizerEmbed";
 import { AudioAnalyzerEmbed } from "@/components/AudioAnalyzerEmbed";
 import { CollaborationPresence } from "@/components/CollaborationPresence";
+import { CollaboratorCursors } from "@/components/CollaboratorCursors";
 import { ExportPDF } from "@/components/ExportPDF";
 import { VoiceToScript } from "@/components/VoiceToScript";
 import { VersionHistory } from "@/components/VersionHistory";
 import { CharacterManager } from "@/components/CharacterManager";
+import { useRealtimeScript } from "@/hooks/useRealtimeScript";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Project {
   id: string;
@@ -31,6 +35,8 @@ interface Project {
   target_audience: string | null;
   script_content: string | null;
   scene_description: string | null;
+  project_code?: string;
+  user_id: string;
 }
 
 const aiFeatures = [
@@ -53,26 +59,63 @@ export default function ProjectPage() {
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [aiResults, setAiResults] = useState<Record<string, any>>({});
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [insightRefresh, setInsightRefresh] = useState(0);
   const [mediaRefresh, setMediaRefresh] = useState(0);
   
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const sceneTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const syncTimeoutRef = useRef<NodeJS.Timeout>();
+  
   const { toast } = useToast();
+
+  // Real-time script syncing
+  const handleRemoteScriptChange = useCallback((content: string) => {
+    setScriptContent(content);
+  }, []);
+  
+  const handleRemoteSceneChange = useCallback((description: string) => {
+    setSceneDescription(description);
+  }, []);
+
+  const { updateScript, updateScene } = useRealtimeScript({
+    projectId: id || '',
+    onScriptChange: handleRemoteScriptChange,
+    onSceneChange: handleRemoteSceneChange,
+  });
+
+  // Debounced sync for local changes
+  const handleScriptChange = useCallback((value: string) => {
+    setScriptContent(value);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      updateScript(value);
+    }, 500);
+  }, [updateScript]);
+
+  const handleSceneChange = useCallback((value: string) => {
+    setSceneDescription(value);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(() => {
+      updateScene(value);
+    }, 500);
+  }, [updateScene]);
 
   useEffect(() => {
     fetchProject();
   }, [id]);
 
   const fetchProject = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from("projects")
-      .select("*")
+      .select("*") as any)
       .eq("id", id)
       .single();
     
     if (error) {
       toast({ title: "Error", description: "Failed to load project", variant: "destructive" });
     } else {
-      setProject(data);
+      setProject(data as Project);
       setScriptContent(data.script_content || "");
       setSceneDescription(data.scene_description || "");
     }
@@ -392,6 +435,40 @@ export default function ProjectPage() {
             <CollaborationPresence projectId={id!} />
           </div>
           <div className="flex items-center gap-2">
+            {/* Share Project Code */}
+            {project.user_id === user?.id && project.project_code && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64">
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">Project Code</p>
+                    <p className="text-xs text-muted-foreground">Share this code with teammates to let them request access.</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-muted px-3 py-2 rounded-md text-lg font-mono tracking-widest text-center">
+                        {project.project_code}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(project.project_code || '');
+                          setCodeCopied(true);
+                          setTimeout(() => setCodeCopied(false), 2000);
+                          toast({ title: "Copied!", description: "Project code copied to clipboard" });
+                        }}
+                      >
+                        {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
             <CharacterManager projectId={id!} />
             <VersionHistory 
               projectId={id!}
@@ -424,29 +501,36 @@ export default function ProjectPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Script Content</h3>
                 <VoiceToScript 
-                  onTranscript={(text) => setScriptContent(prev => prev + (prev ? ' ' : '') + text)}
+                  onTranscript={(text) => handleScriptChange(scriptContent + (scriptContent ? ' ' : '') + text)}
                 />
               </div>
-              <Textarea 
-                value={scriptContent}
-                onChange={(e) => setScriptContent(e.target.value)}
-                placeholder="Paste your script here or use voice input..."
-                className="min-h-[200px] bg-muted/50 border-border"
-              />
+              <div className="relative">
+                <Textarea 
+                  ref={scriptTextareaRef}
+                  value={scriptContent}
+                  onChange={(e) => handleScriptChange(e.target.value)}
+                  placeholder="Paste your script here or use voice input..."
+                  className="min-h-[200px] bg-muted/50 border-border"
+                />
+                <CollaboratorCursors projectId={id!} textareaRef={scriptTextareaRef} />
+              </div>
             </div>
             <div className="card-cinematic rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Scene Description</h3>
                 <VoiceToScript 
-                  onTranscript={(text) => setSceneDescription(prev => prev + (prev ? ' ' : '') + text)}
+                  onTranscript={(text) => handleSceneChange(sceneDescription + (sceneDescription ? ' ' : '') + text)}
                 />
               </div>
-              <Textarea 
-                value={sceneDescription}
-                onChange={(e) => setSceneDescription(e.target.value)}
-                placeholder="Describe the scene or use voice input..."
-                className="min-h-[120px] bg-muted/50 border-border"
-              />
+              <div className="relative">
+                <Textarea 
+                  ref={sceneTextareaRef}
+                  value={sceneDescription}
+                  onChange={(e) => handleSceneChange(e.target.value)}
+                  placeholder="Describe the scene or use voice input..."
+                  className="min-h-[120px] bg-muted/50 border-border"
+                />
+              </div>
             </div>
             
             {id && <SavedInsightsList projectId={id} refreshTrigger={insightRefresh} />}

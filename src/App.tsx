@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import ProjectPage from "./pages/ProjectPage";
 import ProfilePage from "./pages/ProfilePage";
 import InsightsPage from "./pages/InsightsPage";
+import CollaborationPage from "./pages/CollaborationPage";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/project/:id" element={<ProtectedRoute><ProjectPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
+          <Route path="/collaboration" element={<ProtectedRoute><CollaborationPage /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
