@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Film, ArrowLeft, Save, Sparkles, Clapperboard, Brain, 
-  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Share2
+  Music, BookOpen, TrendingUp, Loader2, Copy, Check, Share2, Eye
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SaveInsightButton } from "@/components/SaveInsightButton";
@@ -25,8 +25,11 @@ import { VoiceToScript } from "@/components/VoiceToScript";
 import { VersionHistory } from "@/components/VersionHistory";
 import { CharacterManager } from "@/components/CharacterManager";
 import { useRealtimeScript } from "@/hooks/useRealtimeScript";
+import { useCollaboratorRole } from "@/hooks/useCollaboratorRole";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ProjectChat } from "@/components/ProjectChat";
+import { CollaboratorRoleManager } from "@/components/CollaboratorRoleManager";
 
 interface Project {
   id: string;
@@ -68,6 +71,9 @@ export default function ProjectPage() {
   const syncTimeoutRef = useRef<NodeJS.Timeout>();
   
   const { toast } = useToast();
+
+  // Role-based permissions
+  const { role, isOwner, canEdit, loading: roleLoading } = useCollaboratorRole({ projectId: id || '' });
 
   // Real-time script syncing
   const handleRemoteScriptChange = useCallback((content: string) => {
@@ -469,6 +475,14 @@ export default function ProjectPage() {
                 </PopoverContent>
               </Popover>
             )}
+            {/* Manage Team (owner only) */}
+            <CollaboratorRoleManager projectId={id!} isOwner={isOwner} />
+            {/* View-only indicator */}
+            {role === 'viewer' && (
+              <Badge variant="secondary" className="gap-1">
+                <Eye className="w-3 h-3" /> View Only
+              </Badge>
+            )}
             <CharacterManager projectId={id!} />
             <VersionHistory 
               projectId={id!}
@@ -480,10 +494,12 @@ export default function ProjectPage() {
               }}
             />
             <ExportPDF projectId={id!} projectName={project.name} />
-            <Button onClick={saveProject} disabled={saving} className="bg-gradient-gold text-primary-foreground">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-              Save
-            </Button>
+            {canEdit && (
+              <Button onClick={saveProject} disabled={saving} className="bg-gradient-gold text-primary-foreground">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Save
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -500,17 +516,20 @@ export default function ProjectPage() {
             <div className="card-cinematic rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Script Content</h3>
-                <VoiceToScript 
-                  onTranscript={(text) => handleScriptChange(scriptContent + (scriptContent ? ' ' : '') + text)}
-                />
+                {canEdit && (
+                  <VoiceToScript 
+                    onTranscript={(text) => handleScriptChange(scriptContent + (scriptContent ? ' ' : '') + text)}
+                  />
+                )}
               </div>
               <div className="relative">
                 <Textarea 
                   ref={scriptTextareaRef}
                   value={scriptContent}
                   onChange={(e) => handleScriptChange(e.target.value)}
-                  placeholder="Paste your script here or use voice input..."
+                  placeholder={canEdit ? "Paste your script here or use voice input..." : "View only - you cannot edit this script"}
                   className="min-h-[200px] bg-muted/50 border-border"
+                  disabled={!canEdit}
                 />
                 <CollaboratorCursors projectId={id!} textareaRef={scriptTextareaRef} />
               </div>
@@ -518,17 +537,20 @@ export default function ProjectPage() {
             <div className="card-cinematic rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">Scene Description</h3>
-                <VoiceToScript 
-                  onTranscript={(text) => handleSceneChange(sceneDescription + (sceneDescription ? ' ' : '') + text)}
-                />
+                {canEdit && (
+                  <VoiceToScript 
+                    onTranscript={(text) => handleSceneChange(sceneDescription + (sceneDescription ? ' ' : '') + text)}
+                  />
+                )}
               </div>
               <div className="relative">
                 <Textarea 
                   ref={sceneTextareaRef}
                   value={sceneDescription}
                   onChange={(e) => handleSceneChange(e.target.value)}
-                  placeholder="Describe the scene or use voice input..."
+                  placeholder={canEdit ? "Describe the scene or use voice input..." : "View only - you cannot edit this scene"}
                   className="min-h-[120px] bg-muted/50 border-border"
+                  disabled={!canEdit}
                 />
               </div>
             </div>
@@ -630,6 +652,9 @@ export default function ProjectPage() {
           </motion.div>
         </div>
       </main>
+      
+      {/* Collaboration Chat */}
+      <ProjectChat projectId={id!} />
     </div>
   );
 }

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Search, Check, X, Clock, UserPlus, FolderOpen } from "lucide-react";
+import { Users, Search, Check, X, Clock, UserPlus, FolderOpen, Edit, Eye } from "lucide-react";
 
 interface PendingRequest {
   id: string;
@@ -38,6 +39,7 @@ export default function CollaborationPage() {
   const [incomingRequests, setIncomingRequests] = useState<PendingRequest[]>([]);
   const [collaboratedProjects, setCollaboratedProjects] = useState<CollaboratedProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (user) {
@@ -267,13 +269,14 @@ export default function CollaborationPage() {
       if (!request) return;
 
       if (accept) {
-        // Add user as collaborator
+        // Add user as collaborator with selected role (default to editor)
+        const role = selectedRoles[requestId] || 'editor';
         await supabase
           .from('project_collaborators')
           .insert({
             project_id: request.project_id,
             user_id: request.requester_id,
-            role: 'editor'
+            role: role
           });
       }
 
@@ -286,7 +289,7 @@ export default function CollaborationPage() {
       toast({
         title: accept ? "Request accepted" : "Request declined",
         description: accept 
-          ? "The user has been added as a collaborator." 
+          ? `The user has been added as ${selectedRoles[requestId] === 'viewer' ? 'a viewer' : 'an editor'}.`
           : "The request has been declined.",
       });
 
@@ -372,7 +375,27 @@ export default function CollaborationPage() {
                         Wants to join: <span className="text-foreground">{request.project_name}</span>
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={selectedRoles[request.id] || 'editor'}
+                        onValueChange={(value) => setSelectedRoles(prev => ({ ...prev, [request.id]: value }))}
+                      >
+                        <SelectTrigger className="w-28 h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="editor">
+                            <div className="flex items-center gap-2">
+                              <Edit className="w-3 h-3" /> Editor
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="viewer">
+                            <div className="flex items-center gap-2">
+                              <Eye className="w-3 h-3" /> Viewer
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Button
                         size="sm"
                         variant="outline"
@@ -459,7 +482,10 @@ export default function CollaborationPage() {
                           Code: <span className="font-mono">{collab.project_code}</span>
                         </p>
                       </div>
-                      <Badge>{collab.role}</Badge>
+                      <Badge variant={collab.role === 'editor' ? 'default' : 'secondary'}>
+                        {collab.role === 'editor' ? <Edit className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
+                        {collab.role}
+                      </Badge>
                     </div>
                   ))}
                 </div>
