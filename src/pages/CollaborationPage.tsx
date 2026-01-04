@@ -166,14 +166,12 @@ export default function CollaborationPage() {
     setIsJoining(true);
 
     try {
-      // Find project by code
-      const { data: projectResult, error: projectError } = await (supabase
-        .from('projects')
-        .select('id, user_id, name') as any)
-        .eq('project_code', projectCode.trim())
-        .maybeSingle();
+      // Find project by code using security definer function
+      const { data: projectResult, error: projectError } = await supabase
+        .rpc('get_project_by_code', { p_code: projectCode.trim() });
 
-      const project = projectResult as { id: string; user_id: string; name: string } | null;
+      const projectArray = projectResult as { id: string; user_id: string; name: string }[] | null;
+      const project = projectArray && projectArray.length > 0 ? projectArray[0] : null;
 
       if (projectError || !project) {
         toast({

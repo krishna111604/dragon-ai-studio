@@ -372,6 +372,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_project_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          id: string
+          name: string
+          user_id: string
+        }[]
+      }
       is_project_collaborator: {
         Args: { p_project_id: string }
         Returns: boolean
