@@ -76,14 +76,20 @@ export default function Dashboard() {
       return;
     }
 
+    if (!user?.id) {
+      toast({ title: "Error", description: "You must be logged in to create a project", variant: "destructive" });
+      return;
+    }
+
     const { data, error } = await supabase.from("projects").insert({
-      user_id: user?.id,
+      user_id: user.id,
       name: newProject.name,
       genre: newProject.genre || null,
       target_audience: newProject.targetAudience || null,
     }).select().single();
 
     if (error) {
+      console.error("Create project error:", error);
       toast({ title: "Error", description: "Failed to create project", variant: "destructive" });
     } else {
       toast({ title: "Success", description: "Project created!" });
