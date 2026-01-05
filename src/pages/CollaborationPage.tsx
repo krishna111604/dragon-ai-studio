@@ -27,6 +27,8 @@ interface CollaboratedProject {
   role: string;
   project_name?: string;
   project_code?: string;
+  team_count?: number;
+  owner_name?: string;
 }
 
 export default function CollaborationPage() {
@@ -141,14 +143,34 @@ export default function CollaborationPage() {
           collabs.map(async (collab) => {
             const { data: project } = await supabase
               .from('projects')
-              .select('name, project_code')
+              .select('name, project_code, user_id')
               .eq('id', collab.project_id)
               .maybeSingle();
-            const projectData = project as { name?: string; project_code?: string } | null;
+            const projectData = project as { name?: string; project_code?: string; user_id?: string } | null;
+            
+            // Get team member count (collaborators + owner)
+            const { count: collaboratorCount } = await supabase
+              .from('project_collaborators')
+              .select('*', { count: 'exact', head: true })
+              .eq('project_id', collab.project_id);
+            
+            // Get owner's display name
+            let ownerName = 'Unknown';
+            if (projectData?.user_id) {
+              const { data: ownerProfile } = await supabase
+                .from('profiles')
+                .select('display_name')
+                .eq('user_id', projectData.user_id)
+                .maybeSingle();
+              ownerName = ownerProfile?.display_name || 'Project Owner';
+            }
+            
             return { 
               ...collab, 
               project_name: projectData?.name || 'Unknown Project',
-              project_code: projectData?.project_code
+              project_code: projectData?.project_code,
+              team_count: (collaboratorCount || 0) + 1, // +1 for owner
+              owner_name: ownerName
             };
           })
         );
@@ -474,10 +496,19 @@ export default function CollaborationPage() {
                       className="flex items-center justify-between p-4 rounded-lg bg-background/50 border border-border/50 hover:border-primary/50 transition-colors cursor-pointer"
                       onClick={() => navigate(`/project/${collab.project_id}`)}
                     >
-                      <div>
-                        <p className="font-medium">{collab.project_name}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium">{collab.project_name}</p>
+                          <Badge variant="outline" className="text-xs">
+                            <Users className="w-3 h-3 mr-1" />
+                            {collab.team_count} {collab.team_count === 1 ? 'member' : 'members'}
+                          </Badge>
+                        </div>
                         <p className="text-sm text-muted-foreground">
-                          Code: <span className="font-mono">{collab.project_code}</span>
+                          Owner: <span className="text-foreground">{collab.owner_name}</span>
+                          {collab.project_code && (
+                            <> · Code: <span className="font-mono">{collab.project_code}</span></>
+                          )}
                         </p>
                       </div>
                       <Badge variant={collab.role === 'editor' ? 'default' : 'secondary'}>
