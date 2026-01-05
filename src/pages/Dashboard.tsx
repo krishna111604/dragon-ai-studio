@@ -1,14 +1,23 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Film, Plus, FolderOpen, Trash2, Sparkles, 
-  Clapperboard, Brain, Music, BookOpen, TrendingUp, Search
+import {
+  Film,
+  Plus,
+  FolderOpen,
+  Trash2,
+  Sparkles,
+  Clapperboard,
+  Brain,
+  Music,
+  BookOpen,
+  TrendingUp,
+  Search,
 } from "lucide-react";
 import {
   Dialog,
@@ -22,6 +31,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { RecentInsightsWidget } from "@/components/RecentInsightsWidget";
 import { InspirationFeed } from "@/components/InspirationFeed";
 import { DragonAnimation } from "@/components/DragonAnimation";
+import { ProjectDeleteConfirm } from "@/components/ProjectDeleteConfirm";
 
 interface Project {
   id: string;
@@ -52,16 +62,16 @@ export default function Dashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
   const fetchProjects = async () => {
+    if (!user?.id) return;
+
+    setLoading(true);
     const { data, error } = await supabase
       .from("projects")
       .select("*")
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false });
-    
+
     if (error) {
       toast({ title: "Error", description: "Failed to load projects", variant: "destructive" });
     } else {
@@ -69,6 +79,10 @@ export default function Dashboard() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchProjects();
+  }, [user?.id]);
 
   const createProject = async () => {
     if (!newProject.name.trim()) {
@@ -81,12 +95,16 @@ export default function Dashboard() {
       return;
     }
 
-    const { data, error } = await supabase.from("projects").insert({
-      user_id: user.id,
-      name: newProject.name,
-      genre: newProject.genre || null,
-      target_audience: newProject.targetAudience || null,
-    }).select().single();
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        name: newProject.name,
+        genre: newProject.genre || null,
+        target_audience: newProject.targetAudience || null,
+      })
+      .select()
+      .single();
 
     if (error) {
       console.error("Create project error:", error);
@@ -99,24 +117,26 @@ export default function Dashboard() {
     }
   };
 
-  const deleteProject = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Optimistically remove from UI immediately
+  const deleteProject = async (id: string) => {
+    // Optimistic UI update
     setProjects(prev => prev.filter(p => p.id !== id));
-    
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) {
-      // Restore projects on error
-      fetchProjects();
+
+    const { data, error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", id)
+      .select("id");
+
+    if (error || !data || data.length === 0) {
+      await fetchProjects();
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
-    } else {
-      toast({ title: "Deleted", description: "Project removed", duration: 1000 });
+      return;
     }
+
+    toast({ title: "Deleted", description: "Project removed", duration: 1000 });
   };
 
-  const filteredProjects = projects.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProjects = projects.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="min-h-screen bg-background flex relative">
@@ -233,14 +253,19 @@ export default function Dashboard() {
                     <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Film className="w-6 h-6 text-primary" />
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={(e) => deleteProject(project.id, e)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                    <ProjectDeleteConfirm
+                      projectName={project.name}
+                      onConfirm={() => deleteProject(project.id)}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </ProjectDeleteConfirm>
                   </div>
                   <h3 className="font-semibold text-lg mb-1">{project.name}</h3>
                   <p className="text-sm text-muted-foreground">
