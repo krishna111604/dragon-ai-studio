@@ -101,11 +101,15 @@ export default function Dashboard() {
 
   const deleteProject = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Optimistically remove from UI immediately
+    setProjects(prev => prev.filter(p => p.id !== id));
+    
     const { error } = await supabase.from("projects").delete().eq("id", id);
     if (error) {
+      // Restore projects on error
+      fetchProjects();
       toast({ title: "Error", description: "Failed to delete", variant: "destructive" });
     } else {
-      setProjects(projects.filter(p => p.id !== id));
       toast({ title: "Deleted", description: "Project removed", duration: 1000 });
     }
   };
