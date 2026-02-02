@@ -68,10 +68,14 @@ export default function Auth() {
       }
     } catch (error: any) {
       let message = "An error occurred during authentication";
-      if (error.message.includes("User already registered")) {
+      if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+        message = "Unable to connect to the server. Please check your connection and try again.";
+      } else if (error.message?.includes("User already registered")) {
         message = "This email is already registered. Please sign in instead.";
-      } else if (error.message.includes("Invalid login credentials")) {
+      } else if (error.message?.includes("Invalid login credentials")) {
         message = "Invalid email or password. Please try again.";
+      } else if (error.message?.includes("Email not confirmed")) {
+        message = "Please check your email and confirm your account before signing in.";
       } else if (error.message) {
         message = error.message;
       }
