@@ -10,6 +10,7 @@ import ProjectPage from "./pages/ProjectPage";
 import ProfilePage from "./pages/ProfilePage";
 import InsightsPage from "./pages/InsightsPage";
 import CollaborationPage from "./pages/CollaborationPage";
+import ToolsPage from "./pages/ToolsPage";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/insights" element={<ProtectedRoute><InsightsPage /></ProtectedRoute>} />
           <Route path="/collaboration" element={<ProtectedRoute><CollaborationPage /></ProtectedRoute>} />
+          <Route path="/tools" element={<ProtectedRoute><ToolsPage /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
