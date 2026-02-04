@@ -18,6 +18,10 @@ import {
   BookOpen,
   TrendingUp,
   Search,
+  Target,
+  Camera,
+  Palette,
+  Wrench,
 } from "lucide-react";
 import {
   Dialog,
@@ -50,6 +54,13 @@ const aiFeatures = [
   { icon: Music, name: "Emotional Arc", desc: "Music & sound", color: "text-success" },
   { icon: BookOpen, name: "Film Historian", desc: "References & inspirations", color: "text-warning" },
   { icon: TrendingUp, name: "The Oracle", desc: "Predictive analytics", color: "text-primary" },
+];
+
+const toolkitFeatures = [
+  { icon: Target, name: "Daily Challenge", desc: "Sharpen your skills", path: "/tools?tab=challenges" },
+  { icon: Camera, name: "Shot List", desc: "Plan your shots", path: "/tools?tab=shotlist" },
+  { icon: Clapperboard, name: "Director Style", desc: "Learn from legends", path: "/tools?tab=director" },
+  { icon: Palette, name: "Mood Board", desc: "Visualize your vision", path: "/tools?tab=moodboard" },
 ];
 
 export default function Dashboard() {
@@ -160,6 +171,41 @@ export default function Dashboard() {
                 <p className="text-sm font-medium">{feature.name}</p>
                 <p className="text-xs text-muted-foreground">{feature.desc}</p>
               </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Toolkit Quick Access */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-primary" />
+              Filmmaker's Toolkit
+            </h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/tools")}>
+              View All
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {toolkitFeatures.map((tool, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.05 }}
+                onClick={() => navigate(tool.path)}
+                className="card-cinematic rounded-lg p-4 hover-lift cursor-pointer group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-gold/20 flex items-center justify-center group-hover:bg-gradient-gold transition-colors">
+                    <tool.icon className="w-5 h-5 text-primary group-hover:text-primary-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{tool.name}</p>
+                    <p className="text-xs text-muted-foreground">{tool.desc}</p>
+                  </div>
+                </div>
+              </motion.div>
             ))}
           </div>
         </motion.div>

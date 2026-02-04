@@ -12,11 +12,17 @@ type AIFeature =
   | 'emotional_arc'
   | 'film_historian'
   | 'oracle_prediction'
-  | 'audio_analyzer';
+  | 'audio_analyzer'
+  | 'shot_list'
+  | 'director_style'
+  | 'color_palette'
+  | 'mood_board_image'
+  | 'weather_notes'
+  | 'budget_estimate';
 
 interface RequestBody {
   feature: AIFeature;
-  projectData: {
+  projectData?: {
     name: string;
     genre?: string;
     targetAudience?: string;
@@ -24,6 +30,8 @@ interface RequestBody {
     sceneDescription?: string;
   };
   additionalContext?: string;
+  userPrompt?: string;
+  generateImage?: boolean;
 }
 
 const systemPrompts: Record<AIFeature, string> = {
@@ -161,6 +169,18 @@ Analyze the project and provide rich audio recommendations:
 **Silence as Tool**: "Some of your most powerful moments need no music at all. The confrontation scene in the kitchen - let it play in complete silence except for the ambient room tone. The absence of score makes every word land like a punch"
 
 Write as if you're in a spotting session with the director, painting the film's emotional landscape in sound.`,
+
+  shot_list: `You are an expert cinematographer and 1st AD. Generate professional shot lists with camera angles, movements, and technical notes. Return structured JSON arrays.`,
+
+  director_style: `You are a film studies professor analyzing how legendary directors approach their craft. Provide detailed analysis of how specific directors would shoot given scenes.`,
+
+  color_palette: `You are a professional colorist and production designer. Generate cinematic color palettes that evoke specific moods and atmospheres.`,
+
+  mood_board_image: `You are a visual artist creating cinematic mood board images. Generate atmospheric, professional cinematography-inspired visuals.`,
+
+  weather_notes: `You are an experienced line producer. Provide practical weather considerations and crew preparation notes for film shoots.`,
+
+  budget_estimate: `You are a professional film production manager. Analyze scripts and provide detailed, realistic budget breakdowns for indie productions.`,
 };
 
 serve(async (req) => {
@@ -176,41 +196,66 @@ serve(async (req) => {
       throw new Error('AI service is not configured');
     }
 
-    const { feature, projectData, additionalContext }: RequestBody = await req.json();
+    const { feature, projectData, additionalContext, userPrompt, generateImage }: RequestBody = await req.json();
     
-    console.log(`Processing ${feature} request for project: ${projectData.name}`);
+    console.log(`Processing ${feature} request`);
 
     if (!feature || !systemPrompts[feature]) {
       throw new Error(`Invalid feature type: ${feature}`);
     }
 
-    // Build the user prompt based on available data
-    let userPrompt = `Please analyze the following film project and provide your expert insights in natural, readable prose. Remember: NO code, NO JSON formatting, NO technical syntax - just clear, professional creative consultation.\n\n`;
-    userPrompt += `**Project Name:** ${projectData.name}\n`;
+    // If a direct userPrompt is provided, use it (for new features)
+    let finalUserPrompt: string;
     
-    if (projectData.genre) {
-      userPrompt += `**Genre:** ${projectData.genre}\n`;
-    }
-    
-    if (projectData.targetAudience) {
-      userPrompt += `**Target Audience:** ${projectData.targetAudience}\n`;
-    }
-    
-    if (projectData.scriptContent) {
-      userPrompt += `\n**Script/Content:**\n${projectData.scriptContent}\n`;
-    }
-    
-    if (projectData.sceneDescription) {
-      userPrompt += `\n**Scene Description:**\n${projectData.sceneDescription}\n`;
-    }
-    
-    if (additionalContext) {
-      userPrompt += `\n**Additional Context:**\n${additionalContext}\n`;
-    }
+    if (userPrompt) {
+      finalUserPrompt = userPrompt;
+    } else if (projectData) {
+      // Build the user prompt based on available data (legacy behavior)
+      finalUserPrompt = `Please analyze the following film project and provide your expert insights in natural, readable prose. Remember: NO code, NO JSON formatting, NO technical syntax - just clear, professional creative consultation.\n\n`;
+      finalUserPrompt += `**Project Name:** ${projectData.name}\n`;
+      
+      if (projectData.genre) {
+        finalUserPrompt += `**Genre:** ${projectData.genre}\n`;
+      }
+      
+      if (projectData.targetAudience) {
+        finalUserPrompt += `**Target Audience:** ${projectData.targetAudience}\n`;
+      }
+      
+      if (projectData.scriptContent) {
+        finalUserPrompt += `\n**Script/Content:**\n${projectData.scriptContent}\n`;
+      }
+      
+      if (projectData.sceneDescription) {
+        finalUserPrompt += `\n**Scene Description:**\n${projectData.sceneDescription}\n`;
+      }
+      
+      if (additionalContext) {
+        finalUserPrompt += `\n**Additional Context:**\n${additionalContext}\n`;
+      }
 
-    userPrompt += `\nProvide your analysis as natural prose organized under clear headings. Write conversationally, as if you're advising a fellow filmmaker.`;
+      finalUserPrompt += `\nProvide your analysis as natural prose organized under clear headings. Write conversationally, as if you're advising a fellow filmmaker.`;
+    } else {
+      throw new Error('Either userPrompt or projectData is required');
+    }
 
     console.log(`Calling Lovable AI Gateway for ${feature}...`);
+
+    // Use image generation model if requested
+    const model = generateImage ? 'google/gemini-2.5-flash-image' : 'google/gemini-2.5-flash-lite';
+    const requestBody: any = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompts[feature] },
+        { role: 'user', content: finalUserPrompt }
+      ],
+      max_tokens: 2048,
+    };
+
+    // Add modalities for image generation
+    if (generateImage) {
+      requestBody.modalities = ['image', 'text'];
+    }
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -218,14 +263,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
-        messages: [
-          { role: 'system', content: systemPrompts[feature] },
-          { role: 'user', content: userPrompt }
-        ],
-        max_tokens: 2048,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
@@ -250,13 +288,23 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+
+    // For direct prompt features, return the raw response for client parsing
+    if (userPrompt) {
+      console.log(`Successfully processed ${feature}`);
+      return new Response(
+        JSON.stringify(data),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
       throw new Error('No content received from AI');
     }
 
-    console.log(`Successfully processed ${feature} for project: ${projectData.name}`);
+    console.log(`Successfully processed ${feature} for project: ${projectData?.name || 'unknown'}`);
 
     // Return as natural prose content
     return new Response(
