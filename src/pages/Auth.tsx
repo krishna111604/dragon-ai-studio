@@ -21,11 +21,13 @@ export default function Auth() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAuth = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setNetworkError(false);
     
     const validation = authSchema.safeParse({ email, password });
     if (!validation.success) {
@@ -68,8 +70,11 @@ export default function Auth() {
       }
     } catch (error: any) {
       let message = "An error occurred during authentication";
-      if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+      const isNetworkIssue = error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError");
+      
+      if (isNetworkIssue) {
         message = "Unable to connect to the server. Please check your connection and try again.";
+        setNetworkError(true);
       } else if (error.message?.includes("User already registered")) {
         message = "This email is already registered. Please sign in instead.";
       } else if (error.message?.includes("Invalid login credentials")) {
@@ -205,6 +210,18 @@ export default function Auth() {
                 <>{isLogin ? "Sign In" : "Create Account"}</>
               )}
             </Button>
+
+            {networkError && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleAuth()}
+                className="w-full mt-2 border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <Loader2 className="w-4 h-4 mr-2" />
+                Retry Connection
+              </Button>
+            )}
           </form>
 
           <div className="mt-6 text-center">
